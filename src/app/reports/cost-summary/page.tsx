@@ -146,7 +146,7 @@ export default function SummaryPage() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Card className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
           <CardHeader className="relative flex flex-row items-center justify-between pb-2">
@@ -268,41 +268,55 @@ export default function SummaryPage() {
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden">
-          <div
-            className={`absolute inset-0 bg-gradient-to-br ${resourceChange6Months.change > 0 ? "from-blue-500/5 dark:from-blue-500/10" : resourceChange6Months.change < 0 ? "from-amber-500/5 dark:from-amber-500/10" : "from-muted/50"} to-transparent`}
-          />
-          <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Resources (6mo)
-            </CardTitle>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
-              <Boxes className="h-4 w-4 text-blue-500" />
-            </div>
-          </CardHeader>
-          <CardContent className="relative">
-            <div className="text-3xl font-bold tracking-tight">
-              {resourceChange6Months.change > 0 ? "+" : ""}
-              {resourceChange6Months.change}
-            </div>
-            <p className="mt-1 text-xs">
-              {resourceChange6Months.pct !== 0 ? (
-                <span
-                  className={
-                    resourceChange6Months.change > 0
-                      ? "text-blue-500"
-                      : "text-amber-500"
-                  }
-                >
-                  {formatPercent(resourceChange6Months.pct)} over period
-                </span>
-              ) : (
-                <span className="text-muted-foreground">No change</span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Resource Count by Month */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Resource Count by Month</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 font-medium">Month</th>
+                  <th className="pb-2 font-medium text-right">Resources</th>
+                  <th className="pb-2 font-medium text-right">Change</th>
+                  <th className="pb-2 font-medium text-right">Change %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resourceCountByMonth.map((m, i) => {
+                  const prev = i > 0 ? resourceCountByMonth[i - 1].count : m.count;
+                  const change = m.count - prev;
+                  const changePct = prev > 0 ? (change / prev) * 100 : 0;
+                  return (
+                    <tr key={m.month} className="border-b last:border-0">
+                      <td className="py-2">{formatMonth(m.month + "-01")}</td>
+                      <td className="py-2 text-right font-mono">{m.count}</td>
+                      <td
+                        className={`py-2 text-right font-mono ${
+                          change > 0 ? "text-blue-500" : change < 0 ? "text-amber-500" : ""
+                        }`}
+                      >
+                        {i > 0 ? (change > 0 ? `+${change}` : `${change}`) : "-"}
+                      </td>
+                      <td
+                        className={`py-2 text-right font-mono ${
+                          changePct > 0 ? "text-blue-500" : changePct < 0 ? "text-amber-500" : ""
+                        }`}
+                      >
+                        {i > 0 ? formatPercent(changePct) : "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Month-over-Month Table */}
       <Card>
