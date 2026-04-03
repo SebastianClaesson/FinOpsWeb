@@ -294,6 +294,50 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Regional Budgets */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Regional Budgets</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Set a yearly budget per region. Only regions found in your data are shown. Leave empty for no budget.
+          </p>
+          {availableSubs.length > 0 && (() => {
+            const data = getCostData();
+            const regions = [...new Set(data.map((r) => r.RegionName))].filter(Boolean).sort();
+            return (
+              <div className="space-y-3">
+                {regions.map((region) => (
+                  <div key={region} className="flex items-center gap-3">
+                    <span className="w-36 text-sm truncate">{region}</span>
+                    <div className="flex items-center gap-1 flex-1">
+                      <span className="text-xs text-muted-foreground">$</span>
+                      <input
+                        type="number"
+                        value={settings.regionBudgets[region] || ""}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setSettings((s) => ({
+                            ...s,
+                            regionBudgets: {
+                              ...s.regionBudgets,
+                              [region]: val,
+                            },
+                          }));
+                        }}
+                        placeholder="No budget"
+                        className="h-8 w-full rounded-lg border bg-background px-2 text-sm font-mono transition-colors focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Account Info (placeholder for MSAL) */}
       <Card className="border-dashed">
         <CardHeader>

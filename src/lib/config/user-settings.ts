@@ -20,6 +20,8 @@ export interface UserSettings {
   showSavings: boolean;
   /** Yearly budget in dollars (0 = no budget set) */
   yearlyBudget: number;
+  /** Per-region yearly budgets (region name -> amount). Empty = no regional budgets. */
+  regionBudgets: Record<string, number>;
 }
 
 const STORAGE_KEY = "finops-user-settings";
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   tablePageSize: 50,
   showSavings: true,
   yearlyBudget: 0,
+  regionBudgets: {},
 };
 
 export function loadSettings(): UserSettings {
