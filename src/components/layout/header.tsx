@@ -1,5 +1,6 @@
 import { branding } from "@/lib/config/branding";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Settings } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -30,7 +31,14 @@ export function Header() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Link
+            href="/settings"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            aria-label="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
           <ThemeToggle />
         </div>
       </div>

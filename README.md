@@ -87,7 +87,9 @@ The dummy data includes:
 | Phase | Data source |
 |---|---|
 | **Phase 2** | Azure Cost Management CSV exports (FOCUS format) |
-| **Phase 3** | Azure Billing APIs with MSAL/Entra ID authentication |
+| **Phase 3** | Azure Billing REST APIs with MSAL/Entra ID authentication — for up-to-date and near-realtime cost data without manual exports |
+
+We're planning direct REST API integration so the portal can pull the latest cost data on demand, rather than relying solely on scheduled exports. This will enable near-realtime dashboards once authenticated via Entra ID.
 
 See [ROADMAP.md](ROADMAP.md) for the full plan.
 

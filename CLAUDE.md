@@ -131,6 +131,13 @@ MSAL / Entra ID integration is planned. Design decisions to keep in mind:
 - Token acquisition for Azure Cost Management API calls
 - Support for multi-tenant or single-tenant app registration
 
+## FinOps Hubs Data Model
+
+When ingesting data in Phase 2+, refer to the FinOps Hubs data model for schema compatibility:
+https://learn.microsoft.com/en-us/cloud-computing/finops/toolkit/hubs/data-model
+
+The Hubs pipeline normalizes Azure Cost Management exports into a standardized schema before Power BI consumes it. Our ingestion layer should be compatible with this model.
+
 ## Data Sources (Roadmap)
 
 ### Phase 1 (Current): Static Dummy Data

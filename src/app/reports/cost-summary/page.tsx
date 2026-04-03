@@ -1,7 +1,7 @@
 "use client";
 
 import { useReport } from "@/components/reports/report-context";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   calculateTotals,
   groupBy,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/cost-data";
 import { formatCurrency, formatCompact, formatPercent, formatMonth } from "@/lib/utils/format";
 import { buildChartConfig, CHART_COLORS } from "@/lib/utils/chart-colors";
+import { loadSettings } from "@/lib/config/user-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -31,10 +32,15 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Boxes } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Boxes, Target } from "lucide-react";
 
 export default function SummaryPage() {
   const { filteredData } = useReport();
+  const [yearlyBudget, setYearlyBudget] = useState(0);
+
+  useEffect(() => {
+    setYearlyBudget(loadSettings().yearlyBudget);
+  }, []);
 
   const totals = useMemo(() => calculateTotals(filteredData), [filteredData]);
 
@@ -268,6 +274,46 @@ export default function SummaryPage() {
           </CardContent>
         </Card>
 
+        {yearlyBudget > 0 && (() => {
+          const monthlyBudget = yearlyBudget / 12;
+          const numMonths = monthlyTrend.length || 1;
+          const periodBudget = monthlyBudget * numMonths;
+          const used = totals.effectiveCost;
+          const pctUsed = periodBudget > 0 ? (used / periodBudget) * 100 : 0;
+          const isOver = pctUsed > 100;
+          const annualPace = numMonths > 0 ? (used / numMonths) * 12 : 0;
+          const annualPacePct = yearlyBudget > 0 ? (annualPace / yearlyBudget) * 100 : 0;
+          return (
+            <Card className="relative overflow-hidden">
+              <div className={`absolute inset-0 bg-gradient-to-br ${isOver ? "from-red-500/5 dark:from-red-500/10" : "from-primary/5"} to-transparent`} />
+              <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Budget
+                </CardTitle>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isOver ? "bg-red-500/10" : "bg-primary/10"}`}>
+                  <Target className={`h-4 w-4 ${isOver ? "text-red-500" : "text-primary"}`} />
+                </div>
+              </CardHeader>
+              <CardContent className="relative space-y-2">
+                <div className={`text-2xl font-bold tracking-tight ${isOver ? "text-red-500" : ""}`}>
+                  {pctUsed.toFixed(0)}%
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${isOver ? "bg-red-500" : "bg-primary"}`}
+                    style={{ width: `${Math.min(pctUsed, 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {formatCompact(used)} of {formatCompact(periodBudget)} ({numMonths}mo)
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Annual pace: {formatCompact(annualPace)} / {formatCompact(yearlyBudget)} ({annualPacePct.toFixed(0)}%)
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
 
       {/* Resource Count by Month */}

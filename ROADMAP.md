@@ -55,6 +55,7 @@ Features are organized by priority and phase. Check the box when complete.
 
 ## Phase 1 Enhancements (Planned)
 
+- [ ] **My Settings page** — user preferences (default date range, default subscription scope, preferred currency, default report landing page, number format locale)
 - [ ] Cost optimization advisories per resource (idle resources, right-sizing)
 - [ ] Generation advisory per resource (newer VM SKU suggestions)
 - [ ] Savings plan / reservation comparison (side-by-side on-demand vs committed)
