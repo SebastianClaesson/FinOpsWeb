@@ -70,6 +70,12 @@ npm run build
 npm start
 ```
 
+## Billing agreement support
+
+This project is built primarily for **Microsoft Customer Agreement (MCA)** customers. Microsoft is actively transitioning Enterprise Agreement (EA) customers to MCA — new enrollments are already MCA, and existing EA agreements will migrate to MCA upon renewal. By targeting MCA first, we align with where Microsoft's billing platform is heading.
+
+EA-specific features (e.g., EA invoice reconciliation) are not a priority, but the underlying FOCUS data schema is the same for both agreement types, so most reports work regardless.
+
 ## Data
 
 Currently uses **deterministic dummy data** that follows the [FOCUS (FinOps Open Cost and Usage Specification)](https://focus.finops.org/) v1.0 schema — the same format that Azure Cost Management exports produce.
