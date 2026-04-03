@@ -69,7 +69,24 @@ All cost data follows the **FOCUS (FinOps Open Cost and Usage Specification)** s
 **Commitments:** CommitmentDiscountId, CommitmentDiscountName, CommitmentDiscountStatus, CommitmentDiscountType
 **Currency:** BillingCurrency
 **Tags:** Tags (JSON string)
-**Microsoft extensions (x_ prefix):** x_ResourceGroupName, x_PricingSubcategory, x_SkuMeterCategory, x_SkuMeterSubcategory, x_SkuMeterName, x_CostCenter
+**Microsoft extensions (x_ prefix):** x_ResourceGroupName, x_PricingSubcategory, x_SkuMeterCategory, x_SkuMeterSubcategory, x_SkuMeterName, x_CostCenter, x_InvoiceSectionId, x_InvoiceSectionName, x_BillingProfileId, x_BillingProfileName
+
+## MCA Billing Hierarchy
+
+The project targets Microsoft Customer Agreement (MCA) accounts. The billing hierarchy is:
+
+```
+Billing Account (tenant-level)
+  └── Billing Profile (invoice entity, payment method)
+        └── Invoice Section (logical grouping for cost allocation)
+              └── Subscription (Azure subscription)
+                    └── Resource Group
+                          └── Resource
+```
+
+Reference: https://learn.microsoft.com/en-us/azure/cost-management-billing/understand/mca-overview#invoice-sections
+
+Invoice Sections are critical for chargeback — they group subscriptions for invoicing purposes. The data model must support filtering and grouping by Invoice Section and Billing Profile.
 
 ## Cost Summary Report — Pages to Implement
 

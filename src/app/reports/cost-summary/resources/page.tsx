@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy, parseTags } from "@/lib/data/cost-data";
+import { parseTags } from "@/lib/data/cost-data";
 import { formatCurrency } from "@/lib/utils/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -15,24 +17,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MonthlyComparison } from "@/components/reports/monthly-comparison";
+import { useSortableTable } from "@/components/reports/sortable-header";
+
+function ColFilter({
+  value,
+  onChange,
+  placeholder,
+  align = "left",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  align?: "left" | "right";
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder ?? "Filter..."}
+      className={`h-6 w-full rounded border border-border/50 bg-background px-1.5 text-[11px] font-normal transition-colors placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none ${align === "right" ? "text-right" : ""}`}
+    />
+  );
+}
+
+interface ResourceRow {
+  name: string;
+  type: string;
+  resourceGroup: string;
+  subscription: string;
+  region: string;
+  effectiveCost: number;
+  tags: Record<string, string>;
+}
 
 export default function ResourcesPage() {
   const { filteredData } = useReport();
 
-  // Build resource detail list
+  const [fName, setFName] = useState("");
+  const [fType, setFType] = useState("");
+  const [fRg, setFRg] = useState("");
+  const [fSub, setFSub] = useState("");
+  const [fRegion, setFRegion] = useState("");
+  const [fCostMin, setFCostMin] = useState("");
+  const [fTag, setFTag] = useState("");
+
+  const hasFilters = fName || fType || fRg || fSub || fRegion || fCostMin || fTag;
+
+  const clearFilters = () => {
+    setFName(""); setFType(""); setFRg(""); setFSub("");
+    setFRegion(""); setFCostMin(""); setFTag("");
+  };
+
   const resources = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        name: string;
-        type: string;
-        resourceGroup: string;
-        subscription: string;
-        region: string;
-        effectiveCost: number;
-        tags: Record<string, string>;
-      }
-    >();
+    const map = new Map<string, ResourceRow>();
 
     for (const record of filteredData) {
       const existing = map.get(record.ResourceName);
@@ -51,59 +89,91 @@ export default function ResourcesPage() {
       }
     }
 
-    return [...map.values()].sort((a, b) => b.effectiveCost - a.effectiveCost);
+    return [...map.values()];
   }, [filteredData]);
+
+  const filtered = useMemo(() => {
+    let result = resources;
+    if (fName) { const q = fName.toLowerCase(); result = result.filter((r) => r.name.toLowerCase().includes(q)); }
+    if (fType) { const q = fType.toLowerCase(); result = result.filter((r) => r.type.toLowerCase().includes(q)); }
+    if (fRg) { const q = fRg.toLowerCase(); result = result.filter((r) => r.resourceGroup.toLowerCase().includes(q)); }
+    if (fSub) { const q = fSub.toLowerCase(); result = result.filter((r) => r.subscription.toLowerCase().includes(q)); }
+    if (fRegion) { const q = fRegion.toLowerCase(); result = result.filter((r) => r.region.toLowerCase().includes(q)); }
+    if (fCostMin) { const min = parseFloat(fCostMin); if (!isNaN(min)) result = result.filter((r) => r.effectiveCost >= min); }
+    if (fTag) {
+      const q = fTag.toLowerCase();
+      result = result.filter((r) =>
+        Object.entries(r.tags).some(([k, v]) => k.toLowerCase().includes(q) || v.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [resources, fName, fType, fRg, fSub, fRegion, fCostMin, fTag]);
+
+  const { sorted, SortHeader } = useSortableTable(filtered, "effectiveCost");
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Resources ({resources.length})
+            Resources ({filtered.length}{hasFilters ? ` of ${resources.length}` : ""})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border">
+          {hasFilters && (
+            <div className="mb-2 flex items-center justify-between rounded-md bg-muted/30 px-3 py-1.5">
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Filter className="h-3 w-3" />
+                {filtered.length} of {resources.length} resources
+              </span>
+              <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={clearFilters}>Clear</Button>
+            </div>
+          )}
+          <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Resource</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Resource Group</TableHead>
-                  <TableHead>Subscription</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead className="text-right">Effective Cost</TableHead>
+                  <TableHead><SortHeader field="name">Resource</SortHeader></TableHead>
+                  <TableHead><SortHeader field="type">Type</SortHeader></TableHead>
+                  <TableHead><SortHeader field="resourceGroup">Resource Group</SortHeader></TableHead>
+                  <TableHead><SortHeader field="subscription">Subscription</SortHeader></TableHead>
+                  <TableHead><SortHeader field="region">Region</SortHeader></TableHead>
+                  <TableHead className="text-right"><SortHeader field="effectiveCost" align="right">Effective Cost</SortHeader></TableHead>
                   <TableHead>Tags</TableHead>
+                </TableRow>
+                <TableRow className="bg-muted/20 hover:bg-muted/20">
+                  <TableHead className="py-1"><ColFilter value={fName} onChange={setFName} placeholder="Name..." /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fType} onChange={setFType} placeholder="Type..." /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fRg} onChange={setFRg} placeholder="RG..." /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fSub} onChange={setFSub} placeholder="Sub..." /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fRegion} onChange={setFRegion} placeholder="Region..." /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fCostMin} onChange={setFCostMin} placeholder="Min $..." align="right" /></TableHead>
+                  <TableHead className="py-1"><ColFilter value={fTag} onChange={setFTag} placeholder="Key or value..." /></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {resources.map((r) => (
+                {sorted.map((r) => (
                   <TableRow key={r.name}>
                     <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-48 truncate">
-                      {r.type}
-                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-48 truncate">{r.type}</TableCell>
                     <TableCell>{r.resourceGroup}</TableCell>
                     <TableCell>{r.subscription}</TableCell>
                     <TableCell>{r.region}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(r.effectiveCost)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(r.effectiveCost)}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-64">
                         {Object.entries(r.tags).map(([k, v]) => (
-                          <Badge
-                            key={k}
-                            variant="outline"
-                            className="text-[10px] px-1 py-0"
-                          >
-                            {k}: {v}
-                          </Badge>
+                          <Badge key={k} variant="outline" className="text-[10px] px-1 py-0">{k}: {v}</Badge>
                         ))}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {sorted.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">No resources match the current filters.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -115,11 +185,7 @@ export default function ResourcesPage() {
           <CardTitle className="text-base">Monthly Comparison by Resource</CardTitle>
         </CardHeader>
         <CardContent>
-          <MonthlyComparison
-            data={filteredData}
-            keyFn={(r) => r.ResourceName}
-            nameLabel="Resource"
-          />
+          <MonthlyComparison data={filteredData} keyFn={(r) => r.ResourceName} nameLabel="Resource" />
         </CardContent>
       </Card>
     </div>

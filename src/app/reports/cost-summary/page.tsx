@@ -31,7 +31,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Boxes } from "lucide-react";
 
 export default function SummaryPage() {
   const { filteredData } = useReport();
@@ -82,6 +82,41 @@ export default function SummaryPage() {
     });
   }, [filteredData]);
 
+  // Resource count per month for change tracking
+  const resourceCountByMonth = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const record of filteredData) {
+      const month = record.ChargePeriodStart.substring(0, 7);
+      if (!map.has(month)) map.set(month, new Set());
+      map.get(month)!.add(record.ResourceName);
+    }
+    const months = [...map.keys()].sort();
+    return months.map((m) => ({
+      month: m,
+      count: map.get(m)!.size,
+    }));
+  }, [filteredData]);
+
+  const resourceChangeLastMonth = useMemo(() => {
+    const len = resourceCountByMonth.length;
+    if (len < 2) return { change: 0, pct: 0, current: len > 0 ? resourceCountByMonth[len - 1].count : 0 };
+    const current = resourceCountByMonth[len - 1].count;
+    const prev = resourceCountByMonth[len - 2].count;
+    const change = current - prev;
+    const pct = prev > 0 ? (change / prev) * 100 : 0;
+    return { change, pct: Math.round(pct * 100) / 100, current };
+  }, [resourceCountByMonth]);
+
+  const resourceChange6Months = useMemo(() => {
+    const len = resourceCountByMonth.length;
+    if (len < 2) return { change: 0, pct: 0 };
+    const current = resourceCountByMonth[len - 1].count;
+    const oldest = resourceCountByMonth[0].count;
+    const change = current - oldest;
+    const pct = oldest > 0 ? (change / oldest) * 100 : 0;
+    return { change, pct: Math.round(pct * 100) / 100 };
+  }, [resourceCountByMonth]);
+
   const pricingKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const row of monthlyByPricing) {
@@ -111,7 +146,7 @@ export default function SummaryPage() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
           <CardHeader className="relative flex flex-row items-center justify-between pb-2">
@@ -195,6 +230,76 @@ export default function SummaryPage() {
               {monthlyTrend.length > 1 ? formatPercent(lastMonthChange) : "N/A"}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">vs previous month</p>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden">
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${resourceChangeLastMonth.change > 0 ? "from-blue-500/5 dark:from-blue-500/10" : resourceChangeLastMonth.change < 0 ? "from-amber-500/5 dark:from-amber-500/10" : "from-muted/50"} to-transparent`}
+          />
+          <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Resources (1mo)
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+              <Boxes className="h-4 w-4 text-blue-500" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative">
+            <div className="text-3xl font-bold tracking-tight">
+              {resourceChangeLastMonth.current}
+            </div>
+            <p className="mt-1 text-xs">
+              {resourceChangeLastMonth.change !== 0 ? (
+                <span
+                  className={
+                    resourceChangeLastMonth.change > 0
+                      ? "text-blue-500"
+                      : "text-amber-500"
+                  }
+                >
+                  {resourceChangeLastMonth.change > 0 ? "+" : ""}
+                  {resourceChangeLastMonth.change} ({formatPercent(resourceChangeLastMonth.pct)})
+                </span>
+              ) : (
+                <span className="text-muted-foreground">No change</span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden">
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${resourceChange6Months.change > 0 ? "from-blue-500/5 dark:from-blue-500/10" : resourceChange6Months.change < 0 ? "from-amber-500/5 dark:from-amber-500/10" : "from-muted/50"} to-transparent`}
+          />
+          <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Resources (6mo)
+            </CardTitle>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
+              <Boxes className="h-4 w-4 text-blue-500" />
+            </div>
+          </CardHeader>
+          <CardContent className="relative">
+            <div className="text-3xl font-bold tracking-tight">
+              {resourceChange6Months.change > 0 ? "+" : ""}
+              {resourceChange6Months.change}
+            </div>
+            <p className="mt-1 text-xs">
+              {resourceChange6Months.pct !== 0 ? (
+                <span
+                  className={
+                    resourceChange6Months.change > 0
+                      ? "text-blue-500"
+                      : "text-amber-500"
+                  }
+                >
+                  {formatPercent(resourceChange6Months.pct)} over period
+                </span>
+              ) : (
+                <span className="text-muted-foreground">No change</span>
+              )}
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -14,25 +14,23 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Info } from "lucide-react";
+import { useSortableTable } from "@/components/reports/sortable-header";
+
+interface PurchaseRow {
+  id: string;
+  name: string;
+  type: string;
+  subscription: string;
+  totalCost: number;
+  totalSavings: number;
+  firstSeen: string;
+}
 
 export default function PurchasesPage() {
   const { filteredData } = useReport();
 
-  // In real data, purchases have ChargeCategory === "Purchase"
-  // For dummy data, commitment discounts represent purchases
   const purchases = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        type: string;
-        subscription: string;
-        totalCost: number;
-        totalSavings: number;
-        firstSeen: string;
-      }
-    >();
+    const map = new Map<string, PurchaseRow>();
 
     for (const record of filteredData) {
       if (!record.CommitmentDiscountId) continue;
@@ -57,8 +55,10 @@ export default function PurchasesPage() {
       }
     }
 
-    return [...map.values()].sort((a, b) => b.totalCost - a.totalCost);
+    return [...map.values()];
   }, [filteredData]);
+
+  const { sorted, SortHeader } = useSortableTable(purchases, "totalCost");
 
   if (purchases.length === 0) {
     return (
@@ -76,37 +76,31 @@ export default function PurchasesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Commitment Discounts & Purchases ({purchases.length})
+            Commitment Discounts &amp; Purchases ({purchases.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Subscription</TableHead>
-                  <TableHead>First Seen</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
-                  <TableHead className="text-right">Total Savings</TableHead>
+                  <TableHead><SortHeader field="name">Name</SortHeader></TableHead>
+                  <TableHead><SortHeader field="type">Type</SortHeader></TableHead>
+                  <TableHead><SortHeader field="subscription">Subscription</SortHeader></TableHead>
+                  <TableHead><SortHeader field="firstSeen">First Seen</SortHeader></TableHead>
+                  <TableHead className="text-right"><SortHeader field="totalCost" align="right">Total Cost</SortHeader></TableHead>
+                  <TableHead className="text-right"><SortHeader field="totalSavings" align="right">Total Savings</SortHeader></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchases.map((p) => (
+                {sorted.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{p.type}</Badge>
-                    </TableCell>
+                    <TableCell><Badge variant="outline">{p.type}</Badge></TableCell>
                     <TableCell>{p.subscription}</TableCell>
                     <TableCell>{formatDate(p.firstSeen)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(p.totalCost)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
-                      {formatCurrency(p.totalSavings)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(p.totalCost)}</TableCell>
+                    <TableCell className="text-right font-mono text-green-600">{formatCurrency(p.totalSavings)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
