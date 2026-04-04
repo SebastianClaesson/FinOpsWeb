@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { PurchaseDetail } from "@/lib/types/aggregated";
+import { formatDate } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -27,36 +29,20 @@ interface PurchaseRow {
 }
 
 export default function PurchasesPage() {
-  const { filteredData } = useReport();
+  const { purchases: purchaseDetails } = useReport();
+  const { formatCurrency } = useCurrencyFormat();
 
   const purchases = useMemo(() => {
-    const map = new Map<string, PurchaseRow>();
-
-    for (const record of filteredData) {
-      if (!record.CommitmentDiscountId) continue;
-
-      const existing = map.get(record.CommitmentDiscountId);
-      if (existing) {
-        existing.totalCost += record.EffectiveCost;
-        existing.totalSavings += record.ListCost - record.EffectiveCost;
-        if (record.ChargePeriodStart < existing.firstSeen) {
-          existing.firstSeen = record.ChargePeriodStart;
-        }
-      } else {
-        map.set(record.CommitmentDiscountId, {
-          id: record.CommitmentDiscountId,
-          name: record.CommitmentDiscountName,
-          type: record.CommitmentDiscountType,
-          subscription: record.SubAccountName,
-          totalCost: record.EffectiveCost,
-          totalSavings: record.ListCost - record.EffectiveCost,
-          firstSeen: record.ChargePeriodStart,
-        });
-      }
-    }
-
-    return [...map.values()];
-  }, [filteredData]);
+    return purchaseDetails.map((p: PurchaseDetail) => ({
+      id: p.CommitmentDiscountId,
+      name: p.CommitmentDiscountName,
+      type: p.CommitmentDiscountType,
+      subscription: p.SubAccountName,
+      totalCost: p.effectiveCost,
+      totalSavings: p.listCost - p.effectiveCost,
+      firstSeen: p.firstSeen,
+    }));
+  }, [purchaseDetails]);
 
   const { sorted, SortHeader } = useSortableTable(purchases, "totalCost");
 

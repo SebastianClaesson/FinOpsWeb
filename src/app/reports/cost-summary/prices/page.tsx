@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { formatCurrencyPrecise } from "@/lib/utils/format";
+import { PriceDetail } from "@/lib/types/aggregated";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,8 @@ interface PriceRow {
 }
 
 export default function PricesPage() {
-  const { filteredData } = useReport();
+  const { prices: priceDetails } = useReport();
+  const { formatCurrencyPrecise } = useCurrencyFormat();
 
   const [fService, setFService] = useState("");
   const [fCategory, setFCategory] = useState("");
@@ -40,28 +42,18 @@ export default function PricesPage() {
   const hasFilters = fService || fCategory || fSubcat || fMeter || fUnit;
 
   const prices = useMemo(() => {
-    const map = new Map<string, PriceRow>();
-
-    for (const record of filteredData) {
-      if (!map.has(record.SkuId)) {
-        const listP = record.ListUnitPrice;
-        const contractP = record.ContractedUnitPrice;
-        map.set(record.SkuId, {
-          skuId: record.SkuId,
-          serviceName: record.ServiceName,
-          meterCategory: record.x_SkuMeterCategory,
-          meterSubcategory: record.x_SkuMeterSubcategory,
-          meterName: record.x_SkuMeterName,
-          unit: record.PricingUnit,
-          listUnitPrice: listP,
-          contractedUnitPrice: contractP,
-          discount: listP > 0 ? ((listP - contractP) / listP) * 100 : 0,
-        });
-      }
-    }
-
-    return [...map.values()];
-  }, [filteredData]);
+    return priceDetails.map((p: PriceDetail) => ({
+      skuId: p.SkuId,
+      serviceName: p.ServiceName,
+      meterCategory: p.x_SkuMeterCategory,
+      meterSubcategory: p.x_SkuMeterSubcategory,
+      meterName: p.x_SkuMeterName,
+      unit: p.PricingUnit,
+      listUnitPrice: p.ListUnitPrice,
+      contractedUnitPrice: p.ContractedUnitPrice,
+      discount: p.ListUnitPrice > 0 ? ((p.ListUnitPrice - p.ContractedUnitPrice) / p.ListUnitPrice) * 100 : 0,
+    }));
+  }, [priceDetails]);
 
   const filtered = useMemo(() => {
     let result = prices;

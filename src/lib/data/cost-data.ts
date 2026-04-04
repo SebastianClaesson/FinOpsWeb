@@ -15,62 +15,44 @@ export function getCostData(): FocusCostRecord[] {
 
 /**
  * Apply filters to cost data.
+ * Uses Sets for O(1) lookups instead of Array.includes().
  */
 export function filterCostData(
   data: FocusCostRecord[],
   filters: FilterState
 ): FocusCostRecord[] {
+  // Pre-build Sets for O(1) membership checks
+  const subSet = filters.subscriptions.length > 0 ? new Set(filters.subscriptions) : null;
+  const rgSet = filters.resourceGroups.length > 0 ? new Set(filters.resourceGroups) : null;
+  const regionSet = filters.regions.length > 0 ? new Set(filters.regions) : null;
+  const serviceSet = filters.services.length > 0 ? new Set(filters.services) : null;
+  const commitSet = filters.commitmentTypes.length > 0 ? new Set(filters.commitmentTypes) : null;
+  const { start, end } = filters.dateRange;
+  const currency = filters.currency;
+
   return data.filter((record) => {
     // Date range
-    if (
-      record.ChargePeriodStart < filters.dateRange.start ||
-      record.ChargePeriodStart > filters.dateRange.end
-    ) {
+    if (record.ChargePeriodStart < start || record.ChargePeriodStart > end) {
       return false;
     }
 
     // Subscriptions
-    if (
-      filters.subscriptions.length > 0 &&
-      !filters.subscriptions.includes(record.SubAccountName)
-    ) {
-      return false;
-    }
+    if (subSet && !subSet.has(record.SubAccountName)) return false;
 
     // Resource groups
-    if (
-      filters.resourceGroups.length > 0 &&
-      !filters.resourceGroups.includes(record.x_ResourceGroupName)
-    ) {
-      return false;
-    }
+    if (rgSet && !rgSet.has(record.x_ResourceGroupName)) return false;
 
     // Regions
-    if (
-      filters.regions.length > 0 &&
-      !filters.regions.includes(record.RegionName)
-    ) {
-      return false;
-    }
+    if (regionSet && !regionSet.has(record.RegionName)) return false;
 
     // Services
-    if (
-      filters.services.length > 0 &&
-      !filters.services.includes(record.ServiceCategory)
-    ) {
-      return false;
-    }
+    if (serviceSet && !serviceSet.has(record.ServiceCategory)) return false;
 
     // Commitment types
-    if (filters.commitmentTypes.length > 0) {
-      if (
-        filters.commitmentTypes.includes("On-Demand") &&
-        record.PricingCategory === "On-Demand"
-      ) {
+    if (commitSet) {
+      if (commitSet.has("On-Demand") && record.PricingCategory === "On-Demand") {
         // pass
-      } else if (
-        filters.commitmentTypes.includes(record.CommitmentDiscountType)
-      ) {
+      } else if (commitSet.has(record.CommitmentDiscountType)) {
         // pass
       } else {
         return false;
@@ -78,9 +60,7 @@ export function filterCostData(
     }
 
     // Currency
-    if (filters.currency && record.BillingCurrency !== filters.currency) {
-      return false;
-    }
+    if (currency && record.BillingCurrency !== currency) return false;
 
     return true;
   });
@@ -88,31 +68,49 @@ export function filterCostData(
 
 /**
  * Apply tag filters to cost data.
+ * Pre-converts value arrays to Sets for O(1) lookups.
  */
 export function filterByTags(
   data: FocusCostRecord[],
   tagFilters: Record<string, string[]>
 ): FocusCostRecord[] {
-  if (Object.keys(tagFilters).length === 0) return data;
+  const entries = Object.entries(tagFilters).filter(([, v]) => v.length > 0);
+  if (entries.length === 0) return data;
+
+  // Pre-build Sets
+  const tagSets = entries.map(([key, values]) => ({
+    key,
+    valueSet: new Set(values),
+  }));
 
   return data.filter((record) => {
-    const tags = parseTags(record.Tags);
-    return Object.entries(tagFilters).every(([key, values]) => {
-      if (values.length === 0) return true;
-      return values.includes(tags[key] ?? "");
-    });
+    const tags = parseTagsCached(record);
+    return tagSets.every(({ key, valueSet }) => valueSet.has(tags[key] ?? ""));
   });
 }
 
 /**
- * Parse tags JSON string safely.
+ * Parse tags JSON string safely. Results are cached to avoid
+ * repeated JSON.parse on the same string.
  */
+const tagCache = new WeakMap<FocusCostRecord, Record<string, string>>();
+
 export function parseTags(tagsStr: string): Record<string, string> {
   try {
     return JSON.parse(tagsStr) as Record<string, string>;
   } catch {
     return {};
   }
+}
+
+/** Cached tag parsing keyed on the record object itself. */
+export function parseTagsCached(record: FocusCostRecord): Record<string, string> {
+  let parsed = tagCache.get(record);
+  if (!parsed) {
+    parsed = parseTags(record.Tags);
+    tagCache.set(record, parsed);
+  }
+  return parsed;
 }
 
 // --- Aggregation helpers ---
@@ -273,7 +271,7 @@ export function getUniqueTagKeysAndValues(
   const tagMap = new Map<string, Set<string>>();
 
   for (const record of data) {
-    const tags = parseTags(record.Tags);
+    const tags = parseTagsCached(record);
     for (const [key, value] of Object.entries(tags)) {
       if (!tagMap.has(key)) tagMap.set(key, new Set());
       tagMap.get(key)!.add(value);
@@ -285,6 +283,57 @@ export function getUniqueTagKeysAndValues(
     result[key] = [...values].sort();
   }
   return result;
+}
+
+/**
+ * Single-pass extraction of all unique dimension values for filter dropdowns.
+ * Replaces multiple separate getUniqueValues() calls with one iteration.
+ */
+export interface AllUniqueValues {
+  subscriptions: string[];
+  resourceGroups: string[];
+  regions: string[];
+  services: string[];
+  commitmentTypes: string[];
+  tagKeysAndValues: Record<string, string[]>;
+}
+
+export function getAllUniqueValues(data: FocusCostRecord[]): AllUniqueValues {
+  const subs = new Set<string>();
+  const rgs = new Set<string>();
+  const regions = new Set<string>();
+  const services = new Set<string>();
+  const commitments = new Set<string>();
+  const tagMap = new Map<string, Set<string>>();
+
+  for (const record of data) {
+    if (record.SubAccountName) subs.add(record.SubAccountName);
+    if (record.x_ResourceGroupName) rgs.add(record.x_ResourceGroupName);
+    if (record.RegionName) regions.add(record.RegionName);
+    if (record.ServiceCategory) services.add(record.ServiceCategory);
+    if (record.PricingCategory === "On-Demand") commitments.add("On-Demand");
+    if (record.CommitmentDiscountType) commitments.add(record.CommitmentDiscountType);
+
+    const tags = parseTagsCached(record);
+    for (const [key, value] of Object.entries(tags)) {
+      if (!tagMap.has(key)) tagMap.set(key, new Set());
+      tagMap.get(key)!.add(value);
+    }
+  }
+
+  const tagResult: Record<string, string[]> = {};
+  for (const [key, values] of tagMap.entries()) {
+    tagResult[key] = [...values].sort();
+  }
+
+  return {
+    subscriptions: [...subs].sort(),
+    resourceGroups: [...rgs].sort(),
+    regions: [...regions].sort(),
+    services: [...services].sort(),
+    commitmentTypes: [...commitments].sort(),
+    tagKeysAndValues: tagResult,
+  };
 }
 
 /**

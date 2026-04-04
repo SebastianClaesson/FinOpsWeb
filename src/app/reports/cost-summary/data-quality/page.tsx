@@ -2,31 +2,24 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { getUniqueValues } from "@/lib/data/cost-data";
+import { getFactUniqueValues } from "@/lib/data/fact-helpers";
 import { formatNumber } from "@/lib/utils/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 export default function DataQualityPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts, dataQuality } = useReport();
 
   const stats = useMemo(() => {
-    const chargeCategories = getUniqueValues(filteredData, (r) => r.ChargeCategory);
-    const pricingCategories = getUniqueValues(filteredData, (r) => r.PricingCategory);
-    const services = getUniqueValues(filteredData, (r) => r.ServiceName);
-    const regions = getUniqueValues(filteredData, (r) => r.RegionName);
-    const currencies = getUniqueValues(filteredData, (r) => r.BillingCurrency);
-
-    // Data quality checks
-    const missingResourceName = filteredData.filter((r) => !r.ResourceName).length;
-    const missingRegion = filteredData.filter((r) => !r.RegionName).length;
-    const missingService = filteredData.filter((r) => !r.ServiceName).length;
-    const negativesCost = filteredData.filter((r) => r.EffectiveCost < 0).length;
-    const zeroCost = filteredData.filter((r) => r.EffectiveCost === 0).length;
+    const chargeCategories = getFactUniqueValues(filteredFacts, "ChargeCategory");
+    const pricingCategories = getFactUniqueValues(filteredFacts, "PricingCategory");
+    const services = getFactUniqueValues(filteredFacts, "ServiceName");
+    const regions = getFactUniqueValues(filteredFacts, "RegionName");
+    const currencies = [...new Set(filteredFacts.map((r) => r.BillingCurrency).filter(Boolean))].sort();
 
     return {
-      totalRecords: filteredData.length,
+      totalRecords: dataQuality.totalRecords,
       chargeCategories,
       pricingCategories,
       services,
@@ -35,32 +28,32 @@ export default function DataQualityPage() {
       checks: [
         {
           name: "Missing resource names",
-          count: missingResourceName,
-          ok: missingResourceName === 0,
+          count: dataQuality.missingResourceName,
+          ok: dataQuality.missingResourceName === 0,
         },
         {
           name: "Missing region",
-          count: missingRegion,
-          ok: missingRegion === 0,
+          count: dataQuality.missingRegion,
+          ok: dataQuality.missingRegion === 0,
         },
         {
           name: "Missing service name",
-          count: missingService,
-          ok: missingService === 0,
+          count: dataQuality.missingService,
+          ok: dataQuality.missingService === 0,
         },
         {
           name: "Negative cost records",
-          count: negativesCost,
-          ok: negativesCost === 0,
+          count: dataQuality.negativeCost,
+          ok: dataQuality.negativeCost === 0,
         },
         {
           name: "Zero cost records",
-          count: zeroCost,
-          ok: true, // Zero cost is normal for some resources
+          count: dataQuality.zeroCost,
+          ok: true,
         },
       ],
     };
-  }, [filteredData]);
+  }, [filteredFacts, dataQuality]);
 
   return (
     <div className="space-y-6">

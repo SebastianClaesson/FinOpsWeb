@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { FocusCostRecord } from "@/lib/types/focus";
-import { formatCurrency, formatCompact, formatPercent, formatMonth } from "@/lib/utils/format";
+import { CostFactRow } from "@/lib/types/aggregated";
+import { FactDimension } from "@/lib/data/fact-helpers";
+import { formatPercent, formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Filter, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MonthlyComparisonProps {
-  data: FocusCostRecord[];
-  keyFn: (r: FocusCostRecord) => string;
+  data: CostFactRow[];
+  dimension: FactDimension;
   nameLabel?: string;
 }
 
@@ -16,9 +18,10 @@ type SortDir = "asc" | "desc";
 
 export function MonthlyComparison({
   data,
-  keyFn,
+  dimension,
   nameLabel = "Name",
 }: MonthlyComparisonProps) {
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
   const [nameFilter, setNameFilter] = useState("");
   const [sortField, setSortField] = useState<string>("totalCost");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -36,8 +39,8 @@ export function MonthlyComparison({
   );
 
   const analysis = useMemo(() => {
-    const months = [...new Set(data.map((r) => r.ChargePeriodStart.substring(0, 7)))].sort();
-    const dimensions = [...new Set(data.map(keyFn))].sort();
+    const months = [...new Set(data.map((r) => r.date.substring(0, 7)))].sort();
+    const dimensions = [...new Set(data.map((r) => r[dimension] as string))].sort();
 
     const matrix: Record<string, Record<string, number>> = {};
     for (const dim of dimensions) {
@@ -47,10 +50,10 @@ export function MonthlyComparison({
       }
     }
 
-    for (const record of data) {
-      const dim = keyFn(record);
-      const month = record.ChargePeriodStart.substring(0, 7);
-      matrix[dim][month] += record.EffectiveCost;
+    for (const row of data) {
+      const dim = row[dimension] as string;
+      const month = row.date.substring(0, 7);
+      matrix[dim][month] += row.effectiveCost;
     }
 
     const rows = dimensions.map((dim) => {
@@ -70,7 +73,7 @@ export function MonthlyComparison({
     });
 
     return { monthKeys: months, months: months.map((m) => formatMonth(m + "-01")), rows };
-  }, [data, keyFn]);
+  }, [data, dimension]);
 
   const filtered = useMemo(() => {
     if (!nameFilter) return analysis.rows;

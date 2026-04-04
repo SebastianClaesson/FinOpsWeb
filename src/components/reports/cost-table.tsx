@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { GroupedCost } from "@/lib/data/cost-data";
-import { formatCurrency, formatCompact } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { CHART_COLORS } from "@/lib/utils/chart-colors";
 import {
   Table,
@@ -15,10 +15,13 @@ import {
 import { ChevronDown, ChevronUp, ArrowUpDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const DEFAULT_PAGE_SIZE = 100;
+
 interface CostTableProps {
   data: GroupedCost[];
   nameLabel?: string;
   showSavings?: boolean;
+  pageSize?: number;
   monthlyData?: {
     name: string;
     months: { month: string; cost: number; changePct: number }[];
@@ -54,10 +57,13 @@ export function CostTable({
   data,
   nameLabel = "Name",
   showSavings = true,
+  pageSize = DEFAULT_PAGE_SIZE,
   monthlyData,
 }: CostTableProps) {
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
   const [sortField, setSortField] = useState<SortField>("effectiveCost");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Column filters
   const [nameFilter, setNameFilter] = useState("");
@@ -107,6 +113,16 @@ export function CostTable({
       return multiplier * (a[sortField] - b[sortField]);
     });
   }, [filtered, sortField, sortDir]);
+
+  // Reset page when filters/sort change
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages - 1);
+  if (safePage !== currentPage) setCurrentPage(safePage);
+
+  const paginatedRows = useMemo(() => {
+    const start = safePage * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, safePage, pageSize]);
 
   const total = useMemo(
     () =>
@@ -243,7 +259,8 @@ export function CostTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((row, i) => {
+          {paginatedRows.map((row, i) => {
+            const globalIndex = safePage * pageSize + i;
             const pct =
               total.effectiveCost > 0
                 ? (row.effectiveCost / total.effectiveCost) * 100
@@ -255,7 +272,7 @@ export function CostTable({
                   <div
                     className="h-3 w-3 rounded-sm"
                     style={{
-                      background: CHART_COLORS[i % CHART_COLORS.length],
+                      background: CHART_COLORS[globalIndex % CHART_COLORS.length],
                     }}
                   />
                 </TableCell>
@@ -278,7 +295,7 @@ export function CostTable({
                         className="h-2 rounded-full"
                         style={{
                           width: `${Math.min(pct, 100)}%`,
-                          background: CHART_COLORS[i % CHART_COLORS.length],
+                          background: CHART_COLORS[globalIndex % CHART_COLORS.length],
                         }}
                       />
                     </div>
@@ -339,6 +356,34 @@ export function CostTable({
           )}
         </TableBody>
       </Table>
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            Showing {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={safePage === 0}
+              onClick={() => setCurrentPage(safePage - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={safePage >= totalPages - 1}
+              onClick={() => setCurrentPage(safePage + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,19 +2,21 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { calculateTotals, groupByDate } from "@/lib/data/cost-data";
-import { formatCurrency, formatCompact, formatPercent, formatMonth } from "@/lib/utils/format";
+import { calculateFactTotals, groupFactsByDate } from "@/lib/data/fact-helpers";
+import { formatPercent, formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { DollarSign, TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingDown } from "lucide-react";
 
 export default function InvoicingSummaryPage() {
-  const { filteredData } = useReport();
-  const totals = useMemo(() => calculateTotals(filteredData), [filteredData]);
+  const { formatCurrency, formatCompact, currency } = useCurrencyFormat();
+  const { filteredFacts } = useReport();
+  const totals = useMemo(() => calculateFactTotals(filteredFacts), [filteredFacts]);
 
   const monthlyBilled = useMemo(() => {
-    const monthly = groupByDate(filteredData, "month");
+    const monthly = groupFactsByDate(filteredFacts, "month");
     return monthly.map((m, i) => {
       const prev = i > 0 ? monthly[i - 1].effectiveCost : m.effectiveCost;
       const changePct = prev > 0 ? ((m.effectiveCost - prev) / prev) * 100 : 0;
@@ -25,7 +27,7 @@ export default function InvoicingSummaryPage() {
         changePct: Math.round(changePct * 100) / 100,
       };
     });
-  }, [filteredData]);
+  }, [filteredFacts]);
 
   return (
     <div className="space-y-6">
@@ -35,7 +37,7 @@ export default function InvoicingSummaryPage() {
           <CardHeader className="relative flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Billed Cost</CardTitle>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <DollarSign className="h-4 w-4 text-primary" />
+              <span className="text-xs font-bold text-primary">{currency}</span>
             </div>
           </CardHeader>
           <CardContent className="relative">
@@ -61,7 +63,7 @@ export default function InvoicingSummaryPage() {
           <CardHeader className="relative flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">List Cost</CardTitle>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">{currency}</span>
             </div>
           </CardHeader>
           <CardContent className="relative">

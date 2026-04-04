@@ -217,3 +217,143 @@ These decisions may need revisiting:
 4. **Cost optimization advisories** — This feature (planned) may require integration with Azure Advisor APIs or a local rules engine. The data schema supports it, but the advisory logic needs design.
 
 5. **Generation advisories for SKUs** — Checking if a VM SKU has a newer generation requires a mapping table (e.g., Dv4 → Dv5). This could come from the FinOps Toolkit open data or a custom lookup table.
+
+---
+
+## 12. Data Layer: Pre-Aggregation Architecture
+
+**Chosen:** Server-side pre-aggregation during CSV streaming parse
+
+**Problem:** Real Azure Cost Management FOCUS CSV exports are 200 MB–1 GB+. Loading all raw records into memory (server-side parsing + JSON API response + browser memory) exhausts RAM and freezes the UI.
+
+**Solution:** The CSV streaming parser aggregates records on-the-fly into a compact "fact table" (~20K–50K rows with 15 dimensions) plus small detail tables (resources, prices, purchases, usage, tags). The API returns ~5 MB instead of ~500 MB — a 50–100x reduction.
+
+**Key files:**
+- `src/lib/data/aggregate.ts` — Aggregation engine (per-record upsert into Maps)
+- `src/lib/data/csv-stream-parser.ts` — `parseAndAggregate()` streams CSV without building a record array
+- `src/lib/data/fact-helpers.ts` — Client-side grouping/filtering on the fact table
+- `src/lib/types/aggregated.ts` — Type definitions for all pre-aggregated structures
+
+**Trade-offs:**
+- Cannot perform arbitrary ad-hoc queries on raw fields not in the fact table (e.g., ChargeDescription full-text search)
+- Tag cross-filtering with dimension filters is limited — tag analysis is a standalone workflow on the Tags page
+- Raw record export requires pointing users to the original CSV files
+
+---
+
+## 13. Production Data Backend Roadmap
+
+The current pre-aggregation approach works for the PoC but has scaling limits — it locks into predefined groupings and requires re-aggregation when new dimensions are needed.
+
+**Recommended production options (in order of fit):**
+
+| Option | Cost | Best For | Why |
+|---|---|---|---|
+| **Azure SQL Serverless** | ~$0.50/hr active, $0 idle | Best overall | Full SQL aggregation on demand, auto-pause when unused, familiar tooling, Azure Cost Management exports can pipe directly in |
+| **Azure Data Explorer (ADX/Kusto)** | Higher baseline | Large-scale analytics | Purpose-built for time-series analytics. Azure Cost Management itself uses Kusto internally. Best query performance at scale |
+| **DuckDB-WASM (client-side)** | $0 (client CPU) | No backend needed | SQL queries on Parquet/CSV directly in the browser. Good for single-user scenarios but limited by client hardware |
+| **Azure Cosmos DB** | Moderate | Global distribution | Better than Table Storage for queries but still not great for aggregation-heavy workloads |
+
+**Not recommended:**
+- **Azure Table Storage** — No aggregation support (no SUM, GROUP BY). Would require pre-aggregating anyway, adding infrastructure cost with no benefit over the current approach.
+
+**Migration path:**
+1. Current: Pre-aggregation in Node.js (PoC — works today, zero infra cost)
+2. Next: Azure SQL Serverless — swap the API route to query SQL instead of parsing CSVs. The client-side fact-helpers and report pages stay unchanged.
+3. Future: ADX/Kusto for customers with large multi-tenant datasets
+
+---
+
+## 14. Report Implementation Roadmap
+
+Report pages are scaffolded with navigation and layout but many are still placeholders (`<ComingSoon>`). Below is the implementation status and priority.
+
+### Implemented (data-driven)
+
+| Report Group | Page | Status |
+|---|---|---|
+| **Cost Summary** | Summary, Services, Subscriptions, Resource Groups, Regions, Charge Breakdown, Running Total, Resources, Inventory, Prices, Purchases, Usage Analysis, Data Quality | Done |
+| **Invoicing** | Summary, Chargeback, Invoice Recon, Services, Tags, Prices, Purchases | Done |
+| **Rate Optimization** | Summary | Done |
+
+### Placeholder — needs implementation
+
+**Rate Optimization** (9 pages — requires commitment discount data in FOCUS exports):
+- `commitment-savings` — Savings from reservations/savings plans over time
+- `chargeback` — Commitment discount chargeback allocation
+- `hybrid-benefit` — Azure Hybrid Benefit usage tracking
+- `prices` — Rate-specific price sheet analysis
+- `purchases` — Reservation/savings plan purchase history
+- `recommendations` — Reservation purchase recommendations (may need Azure Advisor API)
+- `resources` — Resources covered by commitments
+- `total-savings` — Total savings breakdown by discount type
+- `utilization` — Commitment utilization tracking
+
+**Governance** (5 pages — requires Azure Resource Graph API):
+- `page.tsx` (summary) — Governance overview dashboard
+- `managed-disks` — Disk tier and encryption compliance
+- `network-security` — NSG rules and public IP audit
+- `policy-compliance` — Azure Policy compliance status
+- `sql-databases` — SQL tier and security configuration
+- `virtual-machines` — VM sizing, generation, and configuration audit
+
+**Workload Optimization** (2 pages — requires Azure Advisor API):
+- `page.tsx` (summary) — Optimization opportunities overview
+- `unattached-disks` — Orphaned/unattached disk detection
+
+### Implementation notes
+- Rate Optimization pages can be built using existing `purchases`, `prices`, and `factTable` data from the pre-aggregation layer. Most need filtering by `CommitmentDiscountType` and `PricingCategory`.
+- Governance and Workload Optimization pages require external Azure APIs (Resource Graph, Advisor) that are not yet integrated. These are blocked on the authentication/MSAL work (see CLAUDE.md Phase 3).
+- Priority: Rate Optimization pages first (data already available), then Governance/Workload after auth integration.
+
+---
+
+## 15. Feature Roadmap — Planned Enhancements
+
+### High priority (can be built with existing data)
+
+**1. Anomaly detection / cost alerts**
+Flag unusual daily spend spikes compared to historical baseline (e.g., > 2 standard deviations from 30-day average). No external APIs needed — statistical analysis on the fact table. Could surface as a banner on the Summary page and a dedicated Anomalies page.
+
+**2. Tagging compliance report**
+Show what percentage of resources have required tags (e.g., `CostCenter`, `Owner`, `Environment`). Very common FinOps requirement. Can be built from the existing `resources` detail table (which includes parsed tags) and `tagCosts`. Display as a compliance score card with drill-down into untagged resources.
+
+**3. Amortized cost view**
+Reservation/savings plan purchases appear as one-time spikes in the current view. An amortized view spreads the cost over the commitment term. The FOCUS spec supports this via `ChargeCategory` + `ChargeSubcategory` + `PricingCategory`. Add a toggle to switch between actual and amortized cost views across all reports.
+
+**4. Savings plan / reservation coverage**
+What percentage of eligible usage is covered by commitments? Compare `PricingCategory = "On-Demand"` vs `"Commitment Discount"` ratios over time. Feeds into the Rate Optimization > Utilization placeholder page. Key metric for FinOps teams evaluating whether to buy more reservations.
+
+**5. Data freshness indicator**
+Show when the CSV data was last exported/updated. The `manifest.json` from Azure Cost Management exports contains this metadata. Surface it in the header/status bar so users know how current their data is. Already parsed by the upload flow but not displayed.
+
+**6. URL-shareable filter state**
+Encode filter selections (date range, subscriptions, regions, etc.) in URL search params so users can share a specific filtered view via link. Already noted as an open question in the codebase — implement using Next.js `useSearchParams` with bidirectional sync to filter state.
+
+### Medium priority (needs additional data model work)
+
+**7. Showback/chargeback export**
+Generate formatted chargeback reports (PDF/Excel) that finance teams can distribute to cost center owners. The Invoicing > Chargeback page already groups by subscription — add an export button that produces a branded, print-ready document with per-cost-center breakdowns, monthly trends, and totals.
+
+**8. Parquet file support**
+Azure Cost Management exports increasingly use Parquet format (smaller files, faster parsing). Currently only CSV is supported. Adding Parquet ingestion via a WASM-based parser (e.g., `parquet-wasm` or DuckDB-WASM) would future-proof the data pipeline and reduce parse times significantly.
+
+**9. Multi-tenant / multi-billing-account support**
+The current app assumes a single dataset. Enterprise customers often have multiple billing accounts or EA enrollments. The FOCUS schema includes `BillingAccountId` and `BillingAccountName` — add a top-level account switcher that filters all reports to a selected billing account. May require partitioned storage in IndexedDB or separate API endpoints per account.
+
+### Lower priority (needs external integrations)
+
+**10. Scheduled report delivery**
+Email or Teams webhook with a summary snapshot (e.g., weekly cost digest). Common ask from FinOps practitioners who don't check dashboards daily. Requires a backend scheduler (Azure Functions timer trigger or similar) and a rendering pipeline to produce the digest. Blocked on authentication and a persistent backend.
+
+### Implementation order suggestion
+1. Data freshness indicator (quick win, metadata already available)
+2. URL-shareable filter state (improves collaboration, no data changes)
+3. Tagging compliance report (new page, uses existing data)
+4. Anomaly detection (new page + Summary banner, uses existing data)
+5. Amortized cost view (toggle across reports, needs data model consideration)
+6. Savings plan / reservation coverage (feeds Rate Optimization pages)
+7. Showback/chargeback export (PDF generation dependency)
+8. Parquet support (new parser dependency)
+9. Multi-tenant support (architecture change)
+10. Scheduled report delivery (requires backend infrastructure)

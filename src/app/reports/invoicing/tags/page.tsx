@@ -2,43 +2,43 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { getUniqueTagKeysAndValues, parseTags, GroupedCost } from "@/lib/data/cost-data";
+import { GroupedCost } from "@/lib/data/cost-data";
 import { CostTable } from "@/components/reports/cost-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
 
 export default function TagsPage() {
-  const { filteredData } = useReport();
+  const { tagCosts, availableTagKeys } = useReport();
 
   const tagKeys = useMemo(
-    () => Object.keys(getUniqueTagKeysAndValues(filteredData)).sort(),
-    [filteredData]
+    () => Object.keys(availableTagKeys).sort(),
+    [availableTagKeys]
   );
 
   const tagCostsByKey = useMemo(() => {
     const result: Record<string, GroupedCost[]> = {};
 
-    for (const tagKey of tagKeys) {
-      const map = new Map<
-        string,
-        { effectiveCost: number; billedCost: number; listCost: number }
-      >();
+    const grouped = new Map<string, Map<string, { effectiveCost: number; billedCost: number; listCost: number }>>();
 
-      for (const record of filteredData) {
-        const tags = parseTags(record.Tags);
-        const value = tags[tagKey] ?? "(untagged)";
-        const existing = map.get(value) ?? {
-          effectiveCost: 0,
-          billedCost: 0,
-          listCost: 0,
-        };
-        existing.effectiveCost += record.EffectiveCost;
-        existing.billedCost += record.BilledCost;
-        existing.listCost += record.ListCost;
-        map.set(value, existing);
+    for (const row of tagCosts) {
+      if (!grouped.has(row.tagKey)) grouped.set(row.tagKey, new Map());
+      const keyMap = grouped.get(row.tagKey)!;
+      const existing = keyMap.get(row.tagValue);
+      if (existing) {
+        existing.effectiveCost += row.effectiveCost;
+        existing.billedCost += row.billedCost;
+        existing.listCost += row.listCost;
+      } else {
+        keyMap.set(row.tagValue, {
+          effectiveCost: row.effectiveCost,
+          billedCost: row.billedCost,
+          listCost: row.listCost,
+        });
       }
+    }
 
-      result[tagKey] = Array.from(map.entries())
+    for (const [tagKey, valueMap] of grouped) {
+      result[tagKey] = Array.from(valueMap.entries())
         .map(([name, costs]) => ({
           name,
           effectiveCost: Math.round(costs.effectiveCost * 100) / 100,
@@ -51,7 +51,7 @@ export default function TagsPage() {
     }
 
     return result;
-  }, [filteredData, tagKeys]);
+  }, [tagCosts]);
 
   if (tagKeys.length === 0) {
     return (

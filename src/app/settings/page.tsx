@@ -8,7 +8,8 @@ import {
   DEFAULT_SETTINGS,
   type UserSettings,
 } from "@/lib/config/user-settings";
-import { getCostData, getUniqueValues } from "@/lib/data/cost-data";
+import { fetchCostData, uploadCsvFiles, clearUploadedData } from "@/lib/data/cost-data-client";
+import { CsvUpload } from "@/components/data/csv-upload";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,12 +56,31 @@ export default function SettingsPage() {
 
   // Available subscriptions from data
   const [availableSubs, setAvailableSubs] = useState<string[]>([]);
+  const [availableRegions, setAvailableRegions] = useState<string[]>([]);
+
+  // Data source state for the upload widget
+  const [dataSource, setDataSource] = useState<string>("loading");
+  const [dataFiles, setDataFiles] = useState<string[]>([]);
+  const [recordCount, setRecordCount] = useState(0);
+  const [uploadedAt, setUploadedAt] = useState<string | undefined>();
+  const [detectedCurrency, setDetectedCurrency] = useState("USD");
 
   useEffect(() => {
     setSettings(loadSettings());
-    const data = getCostData();
-    setAvailableSubs(getUniqueValues(data, (r) => r.SubAccountName));
     setMounted(true);
+
+    // Load current data source info
+    fetchCostData().then((res) => {
+      setDataSource(res.source);
+      setDataFiles(res.meta.files ?? []);
+      setRecordCount(res.meta.totalRawRecords);
+      setAvailableSubs(res.filterOptions.subscriptions);
+      setAvailableRegions(res.filterOptions.regions);
+      // Auto-detect currency from data
+      if (res.factTable.length > 0) {
+        setDetectedCurrency(res.factTable[0].BillingCurrency || "USD");
+      }
+    });
   }, []);
 
   const handleSave = () => {
@@ -98,6 +118,31 @@ export default function SettingsPage() {
           Configure your default preferences. Settings are saved to your browser.
         </p>
       </div>
+
+      {/* Data Source */}
+      <CsvUpload
+        dataSource={dataSource}
+        dataFiles={dataFiles}
+        recordCount={recordCount}
+        uploadedAt={uploadedAt}
+        onUpload={async (files) => {
+          const res = await uploadCsvFiles(files);
+          if (res.factTable.length > 0) {
+            setDataSource(res.source);
+            setDataFiles(res.meta.files ?? []);
+            setRecordCount(res.meta.totalRawRecords);
+          }
+          return res;
+        }}
+        onClear={async () => {
+          await clearUploadedData();
+          const res = await fetchCostData(true);
+          setDataSource(res.source);
+          setDataFiles(res.meta.files ?? []);
+          setRecordCount(res.meta.totalRawRecords);
+          setUploadedAt(undefined);
+        }}
+      />
 
       {/* Default Filters */}
       <Card>
@@ -248,9 +293,9 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Yearly Budget</label>
+            <label className="text-sm font-medium">Yearly Budget ({detectedCurrency})</label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">$</span>
+              <span className="text-sm text-muted-foreground">{detectedCurrency}</span>
               <input
                 type="number"
                 value={settings.yearlyBudget || ""}
@@ -303,16 +348,14 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             Set a yearly budget per region. Only regions found in your data are shown. Leave empty for no budget.
           </p>
-          {availableSubs.length > 0 && (() => {
-            const data = getCostData();
-            const regions = [...new Set(data.map((r) => r.RegionName))].filter(Boolean).sort();
+          {availableRegions.length > 0 && (() => {
             return (
               <div className="space-y-3">
-                {regions.map((region) => (
+                {availableRegions.map((region) => (
                   <div key={region} className="flex items-center gap-3">
                     <span className="w-36 text-sm truncate">{region}</span>
                     <div className="flex items-center gap-1 flex-1">
-                      <span className="text-xs text-muted-foreground">$</span>
+                      <span className="text-xs text-muted-foreground">{detectedCurrency}</span>
                       <input
                         type="number"
                         value={settings.regionBudgets[region] || ""}

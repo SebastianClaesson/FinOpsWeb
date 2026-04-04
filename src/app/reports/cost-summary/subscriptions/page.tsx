@@ -2,12 +2,12 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy } from "@/lib/data/cost-data";
+import { groupByDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { MonthlyComparison } from "@/components/reports/monthly-comparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_COLORS } from "@/lib/utils/chart-colors";
-import { formatCompact } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import {
   ChartContainer,
   ChartTooltip,
@@ -15,14 +15,14 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from "recharts";
 import { buildChartConfig } from "@/lib/utils/chart-colors";
-import { formatCurrency } from "@/lib/utils/format";
 
 export default function SubscriptionsPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
 
   const grouped = useMemo(
-    () => groupBy(filteredData, (r) => r.SubAccountName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'SubAccountName'),
+    [filteredFacts]
   );
 
   return (
@@ -61,8 +61,8 @@ export default function SubscriptionsPage() {
         </CardHeader>
         <CardContent>
           <MonthlyComparison
-            data={filteredData}
-            keyFn={(r) => r.SubAccountName}
+            data={filteredFacts}
+            dimension="SubAccountName"
             nameLabel="Subscription"
           />
         </CardContent>

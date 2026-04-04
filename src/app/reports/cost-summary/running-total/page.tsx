@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { getRunningTotal, calculateTotals, groupByDate } from "@/lib/data/cost-data";
-import { formatCurrency, formatCompact } from "@/lib/utils/format";
+import { getFactRunningTotal, calculateFactTotals } from "@/lib/data/fact-helpers";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { loadSettings } from "@/lib/config/user-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,7 +22,8 @@ import {
 import { Target } from "lucide-react";
 
 export default function RunningTotalPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
   const [yearlyBudget, setYearlyBudget] = useState(0);
 
   useEffect(() => {
@@ -30,16 +31,16 @@ export default function RunningTotalPage() {
   }, []);
 
   const runningTotal = useMemo(
-    () => getRunningTotal(filteredData),
-    [filteredData]
+    () => getFactRunningTotal(filteredFacts),
+    [filteredFacts]
   );
 
-  const totals = useMemo(() => calculateTotals(filteredData), [filteredData]);
+  const totals = useMemo(() => calculateFactTotals(filteredFacts), [filteredFacts]);
 
   const numMonths = useMemo(() => {
-    const months = new Set(filteredData.map((r) => r.ChargePeriodStart.substring(0, 7)));
+    const months = new Set(filteredFacts.map((row) => row.date.substring(0, 7)));
     return months.size || 1;
-  }, [filteredData]);
+  }, [filteredFacts]);
 
   const periodBudget = yearlyBudget > 0 ? (yearlyBudget / 12) * numMonths : 0;
   const pctUsed = periodBudget > 0 ? (totals.effectiveCost / periodBudget) * 100 : 0;

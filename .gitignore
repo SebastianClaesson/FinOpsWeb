@@ -40,5 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Cost data exports (CSV/Parquet — may contain sensitive billing data)
+/data/exports/
+!/data/exports/.gitkeep
+
 # Claude Code
 .claude/

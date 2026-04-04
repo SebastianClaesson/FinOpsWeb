@@ -2,11 +2,12 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy, groupByDateAndDimension } from "@/lib/data/cost-data";
+import { groupByDimension, groupFactsByDateAndDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
-import { formatCompact, formatCurrency, formatMonth } from "@/lib/utils/format";
+import { formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import {
   ChartContainer,
   ChartTooltip,
@@ -24,21 +25,17 @@ import {
 } from "recharts";
 
 export default function InvoicingServicesPage() {
-  const { filteredData } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
+  const { filteredFacts } = useReport();
 
   const byCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, "ServiceCategory"),
+    [filteredFacts]
   );
 
   const monthlyByService = useMemo(
-    () =>
-      groupByDateAndDimension(
-        filteredData,
-        (r) => r.ServiceCategory,
-        "month"
-      ),
-    [filteredData]
+    () => groupFactsByDateAndDimension(filteredFacts, "ServiceCategory", "month"),
+    [filteredFacts]
   );
 
   const serviceKeys = useMemo(() => {

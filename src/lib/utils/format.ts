@@ -23,12 +23,29 @@ export function formatCurrencyPrecise(value: number, currency = "USD"): string {
 }
 
 /**
- * Format a large number with K/M/B suffixes.
+ * Get the currency symbol for a currency code (e.g. "SEK" → "kr", "USD" → "$").
  */
-export function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
+function getCurrencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
+/**
+ * Format a large number with K/M/B suffixes and the correct currency symbol.
+ */
+export function formatCompact(value: number, currency = "USD"): string {
+  const sym = getCurrencySymbol(currency);
+  if (Math.abs(value) >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}K`;
+  return `${sym}${value.toFixed(0)}`;
 }
 
 /**

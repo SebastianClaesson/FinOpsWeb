@@ -2,12 +2,13 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy, groupByDateAndDimension } from "@/lib/data/cost-data";
+import { groupByDimension, groupFactsByDateAndDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { MonthlyComparison } from "@/components/reports/monthly-comparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
-import { formatCompact, formatCurrency, formatMonth } from "@/lib/utils/format";
+import { formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import {
   ChartContainer,
   ChartTooltip,
@@ -25,31 +26,32 @@ import {
 } from "recharts";
 
 export default function ServicesPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
 
   const byCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ServiceCategory'),
+    [filteredFacts]
   );
 
   const byName = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ServiceName'),
+    [filteredFacts]
   );
 
   const byMeter = useMemo(
-    () => groupBy(filteredData, (r) => r.x_SkuMeterCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'x_SkuMeterCategory'),
+    [filteredFacts]
   );
 
   const monthlyByService = useMemo(
     () =>
-      groupByDateAndDimension(
-        filteredData,
-        (r) => r.ServiceCategory,
+      groupFactsByDateAndDimension(
+        filteredFacts,
+        'ServiceCategory',
         "month"
       ),
-    [filteredData]
+    [filteredFacts]
   );
 
   const serviceKeys = useMemo(() => {
@@ -171,8 +173,8 @@ export default function ServicesPage() {
         </CardHeader>
         <CardContent>
           <MonthlyComparison
-            data={filteredData}
-            keyFn={(r) => r.ServiceCategory}
+            data={filteredFacts}
+            dimension="ServiceCategory"
             nameLabel="Service Category"
           />
         </CardContent>

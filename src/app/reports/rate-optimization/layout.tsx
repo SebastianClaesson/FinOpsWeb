@@ -7,7 +7,7 @@ import { Suspense, type ReactNode } from "react";
 
 function ReportShell({ children }: { children: ReactNode }) {
   const {
-    filteredData, filters, setFilters, tagFilters, setTagFilters,
+    filteredFacts, filters, setFilters,
     availableSubscriptions, availableResourceGroups, availableRegions,
     availableServices, availableCommitmentTypes, availableTagKeys,
   } = useReport();
@@ -19,10 +19,10 @@ function ReportShell({ children }: { children: ReactNode }) {
           <h1 className="text-2xl font-bold tracking-tight">Rate Optimization</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Commitment discount savings and recommendations &middot;{" "}
-            <span className="font-mono text-xs">{filteredData.length.toLocaleString()} records</span>
+            <span className="font-mono text-xs">{filteredFacts.length.toLocaleString()} records</span>
           </p>
         </div>
-        <ExportButton data={filteredData} filename="rate-optimization" />
+        <ExportButton data={filteredFacts} filename="rate-optimization" />
       </div>
       <FilterBar
         filters={filters} onFiltersChange={setFilters}
@@ -32,7 +32,6 @@ function ReportShell({ children }: { children: ReactNode }) {
         availableServices={availableServices}
         availableCommitmentTypes={availableCommitmentTypes}
         availableTagKeys={availableTagKeys}
-        tagFilters={tagFilters} onTagFiltersChange={setTagFilters}
       />
       <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
         {children}

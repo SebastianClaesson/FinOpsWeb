@@ -2,12 +2,12 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy } from "@/lib/data/cost-data";
+import { groupByDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { MonthlyComparison } from "@/components/reports/monthly-comparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
-import { formatCompact, formatCurrency } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { loadSettings } from "@/lib/config/user-settings";
 import {
   ChartContainer,
@@ -18,7 +18,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie } from 
 import { Target } from "lucide-react";
 
 export default function RegionsPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
   const [regionBudgets, setRegionBudgets] = useState<Record<string, number>>({});
   const [yearlyBudget, setYearlyBudget] = useState(0);
 
@@ -29,14 +30,14 @@ export default function RegionsPage() {
   }, []);
 
   const grouped = useMemo(
-    () => groupBy(filteredData, (r) => r.RegionName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'RegionName'),
+    [filteredFacts]
   );
 
   const numMonths = useMemo(() => {
-    const months = new Set(filteredData.map((r) => r.ChargePeriodStart.substring(0, 7)));
+    const months = new Set(filteredFacts.map((row) => row.date.substring(0, 7)));
     return months.size || 1;
-  }, [filteredData]);
+  }, [filteredFacts]);
 
   const hasBudgets = Object.values(regionBudgets).some((v) => v > 0);
 
@@ -188,8 +189,8 @@ export default function RegionsPage() {
         </CardHeader>
         <CardContent>
           <MonthlyComparison
-            data={filteredData}
-            keyFn={(r) => r.RegionName}
+            data={filteredFacts}
+            dimension="RegionName"
             nameLabel="Region"
           />
         </CardContent>

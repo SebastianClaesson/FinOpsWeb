@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { getUniqueValues } from "@/lib/data/cost-data";
-import { formatCurrency, formatCompact, formatNumber } from "@/lib/utils/format";
+import { UsageDetail } from "@/lib/types/aggregated";
+import { formatNumber } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -29,12 +30,16 @@ interface UsageRow {
 }
 
 export default function UsageAnalysisPage() {
-  const { filteredData } = useReport();
+  const { usage } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
 
-  const availableUnits = useMemo(
-    () => getUniqueValues(filteredData, (r) => r.ConsumedUnit),
-    [filteredData]
-  );
+  const availableUnits = useMemo(() => {
+    const set = new Set<string>();
+    for (const u of usage) {
+      if (u.ConsumedUnit) set.add(u.ConsumedUnit);
+    }
+    return [...set].sort();
+  }, [usage]);
 
   const [selectedUnit, setSelectedUnit] = useState(availableUnits[0] ?? "");
 
@@ -45,30 +50,15 @@ export default function UsageAnalysisPage() {
   const unitData = useMemo(() => {
     if (!selectedUnit) return [];
 
-    const filtered = filteredData.filter((r) => r.ConsumedUnit === selectedUnit);
-    const map = new Map<string, { name: string; quantity: number; cost: number }>();
-
-    for (const record of filtered) {
-      const existing = map.get(record.ResourceName);
-      if (existing) {
-        existing.quantity += record.ConsumedQuantity;
-        existing.cost += record.EffectiveCost;
-      } else {
-        map.set(record.ResourceName, {
-          name: record.ResourceName,
-          quantity: record.ConsumedQuantity,
-          cost: record.EffectiveCost,
-        });
-      }
-    }
-
-    return [...map.values()].map((v) => ({
-      ...v,
-      quantity: Math.round(v.quantity),
-      cost: Math.round(v.cost * 100) / 100,
-      unitCost: v.quantity > 0 ? Math.round((v.cost / v.quantity) * 10000) / 10000 : 0,
-    }));
-  }, [filteredData, selectedUnit]);
+    return usage
+      .filter((u: UsageDetail) => u.ConsumedUnit === selectedUnit)
+      .map((u: UsageDetail) => ({
+        name: u.ResourceName,
+        quantity: Math.round(u.consumedQuantity),
+        cost: Math.round(u.effectiveCost * 100) / 100,
+        unitCost: u.consumedQuantity > 0 ? Math.round((u.effectiveCost / u.consumedQuantity) * 10000) / 10000 : 0,
+      }));
+  }, [usage, selectedUnit]);
 
   const { sorted, SortHeader } = useSortableTable(unitData, "cost");
 

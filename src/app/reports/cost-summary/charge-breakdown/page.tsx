@@ -2,41 +2,41 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy } from "@/lib/data/cost-data";
+import { groupByDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ChargeBreakdownPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
 
   const byChargeCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.ChargeCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ChargeCategory'),
+    [filteredFacts]
   );
 
   const byChargeSubcategory = useMemo(
-    () => groupBy(filteredData, (r) => r.ChargeSubcategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ChargeSubcategory'),
+    [filteredFacts]
   );
 
   const byPricingCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.PricingCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'PricingCategory'),
+    [filteredFacts]
   );
 
   const byServiceCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ServiceCategory'),
+    [filteredFacts]
   );
 
   const byServiceName = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ServiceName'),
+    [filteredFacts]
   );
 
   const byMeterCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.x_SkuMeterCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'x_SkuMeterCategory'),
+    [filteredFacts]
   );
 
   return (

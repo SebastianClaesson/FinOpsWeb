@@ -2,23 +2,47 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy } from "@/lib/data/cost-data";
+import { groupByDimension, groupFactsByDateAndDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
-import { MonthlyComparison } from "@/components/reports/monthly-comparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
+import { formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function ChargebackPage() {
-  const { filteredData } = useReport();
+  const { formatCurrency, formatCompact } = useCurrencyFormat();
+  const { filteredFacts } = useReport();
 
   const bySubscription = useMemo(
-    () => groupBy(filteredData, (r) => r.SubAccountName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, "SubAccountName"),
+    [filteredFacts]
   );
 
   const byResourceGroup = useMemo(
-    () => groupBy(filteredData, (r) => r.x_ResourceGroupName),
-    [filteredData]
+    () => groupByDimension(filteredFacts, "x_ResourceGroupName"),
+    [filteredFacts]
   );
+
+  const monthlyBySub = useMemo(
+    () => groupFactsByDateAndDimension(filteredFacts, "SubAccountName", "month"),
+    [filteredFacts]
+  );
+
+  const subKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const row of monthlyBySub) {
+      for (const key of Object.keys(row)) {
+        if (key !== "date") keys.add(key);
+      }
+    }
+    return [...keys];
+  }, [monthlyBySub]);
 
   return (
     <div className="space-y-6">
@@ -51,11 +75,32 @@ export default function ChargebackPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <MonthlyComparison
-            data={filteredData}
-            keyFn={(r) => r.SubAccountName}
-            nameLabel="Subscription"
-          />
+          <ChartContainer
+            config={buildChartConfig(subKeys)}
+            className="h-[300px] w-full"
+          >
+            <BarChart data={monthlyBySub}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(v) => formatMonth(v + "-01")}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis tickFormatter={(v) => formatCompact(v)} tick={{ fontSize: 11 }} />
+              <ChartTooltip
+                content={<ChartTooltipContent formatter={(v) => formatCurrency(v as number)} />}
+              />
+              {subKeys.map((key, i) => (
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  stackId="a"
+                  fill={CHART_COLORS[i % CHART_COLORS.length]}
+                  radius={i === subKeys.length - 1 ? [4, 4, 0, 0] : 0}
+                />
+              ))}
+            </BarChart>
+          </ChartContainer>
         </CardContent>
       </Card>
     </div>

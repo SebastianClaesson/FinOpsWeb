@@ -1,0 +1,239 @@
+/**
+ * Client-side helpers for working with pre-aggregated CostFactRow data.
+ *
+ * These produce the exact same output shapes as the original cost-data.ts
+ * functions, so report pages need minimal changes.
+ */
+
+import { CostFactRow } from "@/lib/types/aggregated";
+import { FilterState } from "@/lib/types/focus";
+import { GroupedCost } from "@/lib/data/cost-data";
+
+// ---------------------------------------------------------------------------
+// Filtering
+// ---------------------------------------------------------------------------
+
+/**
+ * Filter fact table rows by the global filter state.
+ * Uses Sets for O(1) lookups.
+ */
+export function filterFactTable(
+  facts: CostFactRow[],
+  filters: FilterState
+): CostFactRow[] {
+  const subSet = filters.subscriptions.length > 0 ? new Set(filters.subscriptions) : null;
+  const rgSet = filters.resourceGroups.length > 0 ? new Set(filters.resourceGroups) : null;
+  const regionSet = filters.regions.length > 0 ? new Set(filters.regions) : null;
+  const serviceSet = filters.services.length > 0 ? new Set(filters.services) : null;
+  const commitSet = filters.commitmentTypes.length > 0 ? new Set(filters.commitmentTypes) : null;
+  const { start, end } = filters.dateRange;
+  const currency = filters.currency;
+
+  return facts.filter((row) => {
+    if (row.date < start || row.date > end) return false;
+    if (subSet && !subSet.has(row.SubAccountName)) return false;
+    if (rgSet && !rgSet.has(row.x_ResourceGroupName)) return false;
+    if (regionSet && !regionSet.has(row.RegionName)) return false;
+    if (serviceSet && !serviceSet.has(row.ServiceCategory)) return false;
+
+    if (commitSet) {
+      if (commitSet.has("On-Demand") && row.PricingCategory === "On-Demand") {
+        // pass
+      } else if (commitSet.has(row.CommitmentDiscountType)) {
+        // pass
+      } else {
+        return false;
+      }
+    }
+
+    if (currency && row.BillingCurrency !== currency) return false;
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dimension grouping (replaces cost-data.ts groupBy)
+// ---------------------------------------------------------------------------
+
+/** Dimension keys available on CostFactRow. */
+export type FactDimension = keyof Pick<
+  CostFactRow,
+  | "SubAccountName"
+  | "x_ResourceGroupName"
+  | "RegionName"
+  | "ServiceCategory"
+  | "ServiceName"
+  | "PricingCategory"
+  | "ChargeCategory"
+  | "ChargeSubcategory"
+  | "x_SkuMeterCategory"
+  | "CommitmentDiscountType"
+>;
+
+/**
+ * Group and sum costs by a single dimension.
+ * Returns the same GroupedCost[] shape as cost-data.ts groupBy().
+ */
+export function groupByDimension(
+  facts: CostFactRow[],
+  dimension: FactDimension
+): GroupedCost[] {
+  const map = new Map<string, { effectiveCost: number; billedCost: number; listCost: number }>();
+
+  for (const row of facts) {
+    const key = row[dimension] as string;
+    const existing = map.get(key);
+    if (existing) {
+      existing.effectiveCost += row.effectiveCost;
+      existing.billedCost += row.billedCost;
+      existing.listCost += row.listCost;
+    } else {
+      map.set(key, {
+        effectiveCost: row.effectiveCost,
+        billedCost: row.billedCost,
+        listCost: row.listCost,
+      });
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([name, costs]) => ({
+      name,
+      effectiveCost: Math.round(costs.effectiveCost * 100) / 100,
+      billedCost: Math.round(costs.billedCost * 100) / 100,
+      listCost: Math.round(costs.listCost * 100) / 100,
+      savings: Math.round((costs.listCost - costs.effectiveCost) * 100) / 100,
+    }))
+    .sort((a, b) => b.effectiveCost - a.effectiveCost);
+}
+
+// ---------------------------------------------------------------------------
+// Time series (replaces cost-data.ts groupByDate)
+// ---------------------------------------------------------------------------
+
+export function groupFactsByDate(
+  facts: CostFactRow[],
+  granularity: "day" | "month" = "day"
+): { date: string; effectiveCost: number; listCost: number; savings: number }[] {
+  const map = new Map<string, { effectiveCost: number; listCost: number }>();
+
+  for (const row of facts) {
+    const key = granularity === "month" ? row.date.substring(0, 7) : row.date;
+    const existing = map.get(key);
+    if (existing) {
+      existing.effectiveCost += row.effectiveCost;
+      existing.listCost += row.listCost;
+    } else {
+      map.set(key, {
+        effectiveCost: row.effectiveCost,
+        listCost: row.listCost,
+      });
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([date, costs]) => ({
+      date,
+      effectiveCost: Math.round(costs.effectiveCost * 100) / 100,
+      listCost: Math.round(costs.listCost * 100) / 100,
+      savings: Math.round((costs.listCost - costs.effectiveCost) * 100) / 100,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---------------------------------------------------------------------------
+// Date × dimension (replaces cost-data.ts groupByDateAndDimension)
+// ---------------------------------------------------------------------------
+
+export function groupFactsByDateAndDimension(
+  facts: CostFactRow[],
+  dimension: FactDimension,
+  granularity: "day" | "month" = "month"
+): { date: string; [key: string]: string | number }[] {
+  const map = new Map<string, Map<string, number>>();
+  const allKeys = new Set<string>();
+
+  for (const row of facts) {
+    const dateKey = granularity === "month" ? row.date.substring(0, 7) : row.date;
+    const dimKey = row[dimension] as string;
+    allKeys.add(dimKey);
+
+    if (!map.has(dateKey)) map.set(dateKey, new Map());
+    const dateMap = map.get(dateKey)!;
+    dateMap.set(dimKey, (dateMap.get(dimKey) ?? 0) + row.effectiveCost);
+  }
+
+  return Array.from(map.entries())
+    .map(([date, dimMap]) => {
+      const entry: { date: string; [key: string]: string | number } = { date };
+      for (const key of allKeys) {
+        entry[key] = Math.round((dimMap.get(key) ?? 0) * 100) / 100;
+      }
+      return entry;
+    })
+    .sort((a, b) => (a.date as string).localeCompare(b.date as string));
+}
+
+// ---------------------------------------------------------------------------
+// Totals (replaces cost-data.ts calculateTotals)
+// ---------------------------------------------------------------------------
+
+export function calculateFactTotals(facts: CostFactRow[]) {
+  let effectiveCost = 0;
+  let billedCost = 0;
+  let listCost = 0;
+
+  for (const row of facts) {
+    effectiveCost += row.effectiveCost;
+    billedCost += row.billedCost;
+    listCost += row.listCost;
+  }
+
+  return {
+    effectiveCost: Math.round(effectiveCost * 100) / 100,
+    billedCost: Math.round(billedCost * 100) / 100,
+    listCost: Math.round(listCost * 100) / 100,
+    totalSavings: Math.round((listCost - effectiveCost) * 100) / 100,
+    savingsPercent:
+      listCost > 0
+        ? Math.round(((listCost - effectiveCost) / listCost) * 10000) / 100
+        : 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Running total (replaces cost-data.ts getRunningTotal)
+// ---------------------------------------------------------------------------
+
+export function getFactRunningTotal(
+  facts: CostFactRow[]
+): { date: string; runningTotal: number; dailyCost: number; savings: number }[] {
+  const daily = groupFactsByDate(facts, "day");
+  let runningTotal = 0;
+
+  return daily.map((d) => {
+    runningTotal += d.effectiveCost;
+    return {
+      date: d.date,
+      runningTotal: Math.round(runningTotal * 100) / 100,
+      dailyCost: d.effectiveCost,
+      savings: d.savings,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Unique values from fact table (for data quality page)
+// ---------------------------------------------------------------------------
+
+export function getFactUniqueValues(
+  facts: CostFactRow[],
+  dimension: FactDimension
+): string[] {
+  const set = new Set<string>();
+  for (const row of facts) {
+    const val = row[dimension] as string;
+    if (val) set.add(val);
+  }
+  return [...set].sort();
+}

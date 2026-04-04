@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { parseTags } from "@/lib/data/cost-data";
-import { formatCurrency } from "@/lib/utils/format";
+import { ResourceDetail } from "@/lib/types/aggregated";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Filter } from "lucide-react";
@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MonthlyComparison } from "@/components/reports/monthly-comparison";
 import { useSortableTable } from "@/components/reports/sortable-header";
 
 function ColFilter({
@@ -52,7 +51,8 @@ interface ResourceRow {
 }
 
 export default function ResourcesPage() {
-  const { filteredData } = useReport();
+  const { resources } = useReport();
+  const { formatCurrency } = useCurrencyFormat();
 
   const [fName, setFName] = useState("");
   const [fType, setFType] = useState("");
@@ -69,31 +69,20 @@ export default function ResourcesPage() {
     setFRegion(""); setFCostMin(""); setFTag("");
   };
 
-  const resources = useMemo(() => {
-    const map = new Map<string, ResourceRow>();
-
-    for (const record of filteredData) {
-      const existing = map.get(record.ResourceName);
-      if (existing) {
-        existing.effectiveCost += record.EffectiveCost;
-      } else {
-        map.set(record.ResourceName, {
-          name: record.ResourceName,
-          type: record.ResourceType,
-          resourceGroup: record.x_ResourceGroupName,
-          subscription: record.SubAccountName,
-          region: record.RegionName,
-          effectiveCost: record.EffectiveCost,
-          tags: parseTags(record.Tags),
-        });
-      }
-    }
-
-    return [...map.values()];
-  }, [filteredData]);
+  const resourceRows = useMemo(() => {
+    return resources.map((r: ResourceDetail) => ({
+      name: r.ResourceName,
+      type: r.ResourceType,
+      resourceGroup: r.x_ResourceGroupName,
+      subscription: r.SubAccountName,
+      region: r.RegionName,
+      effectiveCost: r.effectiveCost,
+      tags: r.tags,
+    }));
+  }, [resources]);
 
   const filtered = useMemo(() => {
-    let result = resources;
+    let result = resourceRows;
     if (fName) { const q = fName.toLowerCase(); result = result.filter((r) => r.name.toLowerCase().includes(q)); }
     if (fType) { const q = fType.toLowerCase(); result = result.filter((r) => r.type.toLowerCase().includes(q)); }
     if (fRg) { const q = fRg.toLowerCase(); result = result.filter((r) => r.resourceGroup.toLowerCase().includes(q)); }
@@ -107,7 +96,7 @@ export default function ResourcesPage() {
       );
     }
     return result;
-  }, [resources, fName, fType, fRg, fSub, fRegion, fCostMin, fTag]);
+  }, [resourceRows, fName, fType, fRg, fSub, fRegion, fCostMin, fTag]);
 
   const { sorted, SortHeader } = useSortableTable(filtered, "effectiveCost");
 
@@ -116,7 +105,7 @@ export default function ResourcesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Resources ({filtered.length}{hasFilters ? ` of ${resources.length}` : ""})
+            Resources ({filtered.length}{hasFilters ? ` of ${resourceRows.length}` : ""})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -124,7 +113,7 @@ export default function ResourcesPage() {
             <div className="mb-2 flex items-center justify-between rounded-md bg-muted/30 px-3 py-1.5">
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Filter className="h-3 w-3" />
-                {filtered.length} of {resources.length} resources
+                {filtered.length} of {resourceRows.length} resources
               </span>
               <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={clearFilters}>Clear</Button>
             </div>
@@ -177,15 +166,6 @@ export default function ResourcesPage() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Monthly Comparison by Resource</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MonthlyComparison data={filteredData} keyFn={(r) => r.ResourceName} nameLabel="Resource" />
         </CardContent>
       </Card>
     </div>

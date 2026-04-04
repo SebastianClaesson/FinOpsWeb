@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { formatCurrency, formatCurrencyPrecise, formatNumber } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,8 @@ interface InventoryRow {
 }
 
 export default function InventoryPage() {
-  const { filteredData } = useReport();
+  const { resources } = useReport();
+  const { formatCurrency, formatCurrencyPrecise } = useCurrencyFormat();
 
   const [fType, setFType] = useState("");
   const [fCountMin, setFCountMin] = useState("");
@@ -36,16 +38,16 @@ export default function InventoryPage() {
   const inventory = useMemo(() => {
     const map = new Map<string, { type: string; resources: Set<string>; totalCost: number }>();
 
-    for (const record of filteredData) {
-      const existing = map.get(record.ResourceType);
+    for (const r of resources) {
+      const existing = map.get(r.ResourceType);
       if (existing) {
-        existing.resources.add(record.ResourceName);
-        existing.totalCost += record.EffectiveCost;
+        existing.resources.add(r.ResourceName);
+        existing.totalCost += r.effectiveCost;
       } else {
-        map.set(record.ResourceType, {
-          type: record.ResourceType,
-          resources: new Set([record.ResourceName]),
-          totalCost: record.EffectiveCost,
+        map.set(r.ResourceType, {
+          type: r.ResourceType,
+          resources: new Set([r.ResourceName]),
+          totalCost: r.effectiveCost,
         });
       }
     }
@@ -56,7 +58,7 @@ export default function InventoryPage() {
       totalCost: Math.round(item.totalCost * 100) / 100,
       costPerResource: Math.round((item.totalCost / item.resources.size) * 100) / 100,
     }));
-  }, [filteredData]);
+  }, [resources]);
 
   const filtered = useMemo(() => {
     let result = inventory;

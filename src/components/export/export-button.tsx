@@ -1,6 +1,5 @@
 "use client";
 
-import { FocusCostRecord } from "@/lib/types/focus";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,22 +12,18 @@ import {
 import { useState } from "react";
 
 interface ExportButtonProps {
-  data: FocusCostRecord[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any[];
   filename?: string;
 }
 
-/**
- * Convert records to CSV string.
- */
-function toCSV(data: FocusCostRecord[]): string {
+function toCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) return "";
   const headers = Object.keys(data[0]);
   const rows = data.map((record) =>
     headers
       .map((h) => {
-        const val = record[h as keyof FocusCostRecord];
-        const str = String(val ?? "");
-        // Escape CSV values that contain commas, quotes, or newlines
+        const str = String(record[h] ?? "");
         if (str.includes(",") || str.includes('"') || str.includes("\n")) {
           return `"${str.replace(/"/g, '""')}"`;
         }
@@ -39,10 +34,7 @@ function toCSV(data: FocusCostRecord[]): string {
   return [headers.join(","), ...rows].join("\n");
 }
 
-/**
- * Convert records to an HTML table string.
- */
-function toHTML(data: FocusCostRecord[]): string {
+function toHTML(data: Record<string, unknown>[]): string {
   if (data.length === 0) return "<p>No data</p>";
   const headers = Object.keys(data[0]);
   const headerRow = headers.map((h) => `<th>${h}</th>`).join("");
@@ -50,10 +42,7 @@ function toHTML(data: FocusCostRecord[]): string {
     .map(
       (record) =>
         `<tr>${headers
-          .map((h) => {
-            const val = record[h as keyof FocusCostRecord];
-            return `<td>${String(val ?? "")}</td>`;
-          })
+          .map((h) => `<td>${String(record[h] ?? "")}</td>`)
           .join("")}</tr>`
     )
     .join("\n");

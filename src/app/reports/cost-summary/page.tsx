@@ -3,12 +3,13 @@
 import { useReport } from "@/components/reports/report-context";
 import { useMemo, useState, useEffect } from "react";
 import {
-  calculateTotals,
-  groupBy,
-  groupByDate,
-  groupByDateAndDimension,
-} from "@/lib/data/cost-data";
-import { formatCurrency, formatCompact, formatPercent, formatMonth } from "@/lib/utils/format";
+  calculateFactTotals,
+  groupByDimension,
+  groupFactsByDate,
+  groupFactsByDateAndDimension,
+} from "@/lib/data/fact-helpers";
+import { formatPercent, formatMonth } from "@/lib/utils/format";
+import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { buildChartConfig, CHART_COLORS } from "@/lib/utils/chart-colors";
 import { loadSettings } from "@/lib/config/user-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,49 +33,50 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Boxes, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, Target } from "lucide-react";
 
 export default function SummaryPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts, resources } = useReport();
+  const { formatCurrency, formatCompact, currency } = useCurrencyFormat();
   const [yearlyBudget, setYearlyBudget] = useState(0);
 
   useEffect(() => {
     setYearlyBudget(loadSettings().yearlyBudget);
   }, []);
 
-  const totals = useMemo(() => calculateTotals(filteredData), [filteredData]);
+  const totals = useMemo(() => calculateFactTotals(filteredFacts), [filteredFacts]);
 
   const topSubscriptions = useMemo(
-    () => groupBy(filteredData, (r) => r.SubAccountName).slice(0, 10),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'SubAccountName').slice(0, 10),
+    [filteredFacts]
   );
   const topResourceGroups = useMemo(
-    () => groupBy(filteredData, (r) => r.x_ResourceGroupName).slice(0, 10),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'x_ResourceGroupName').slice(0, 10),
+    [filteredFacts]
   );
   const topServices = useMemo(
-    () => groupBy(filteredData, (r) => r.ServiceCategory).slice(0, 10),
-    [filteredData]
+    () => groupByDimension(filteredFacts, 'ServiceCategory').slice(0, 10),
+    [filteredFacts]
   );
 
   const monthlyByPricing = useMemo(
     () =>
-      groupByDateAndDimension(
-        filteredData,
-        (r) => r.PricingCategory,
+      groupFactsByDateAndDimension(
+        filteredFacts,
+        'PricingCategory',
         "month"
       ),
-    [filteredData]
+    [filteredFacts]
   );
 
   const dailyTrend = useMemo(
-    () => groupByDate(filteredData, "day").slice(-30),
-    [filteredData]
+    () => groupFactsByDate(filteredFacts, "day").slice(-30),
+    [filteredFacts]
   );
 
   // Month-over-month cost trend for the "last 6 months" comparison
   const monthlyTrend = useMemo(() => {
-    const monthly = groupByDate(filteredData, "month");
+    const monthly = groupFactsByDate(filteredFacts, "month");
     return monthly.map((m, i) => {
       const prev = i > 0 ? monthly[i - 1].effectiveCost : m.effectiveCost;
       const changeAbs = m.effectiveCost - prev;
@@ -86,22 +88,21 @@ export default function SummaryPage() {
         changePct: Math.round(changePct * 100) / 100,
       };
     });
-  }, [filteredData]);
+  }, [filteredFacts]);
 
-  // Resource count per month for change tracking
+  // Total resource count from detail table
+  const totalResourceCount = resources.length;
+
+  // Resource count per month — derived from fact table dates and total resource count
+  // (Per-month resource tracking requires ResourceName in the fact table;
+  //  we show the overall count and monthly cost trend instead)
   const resourceCountByMonth = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const record of filteredData) {
-      const month = record.ChargePeriodStart.substring(0, 7);
-      if (!map.has(month)) map.set(month, new Set());
-      map.get(month)!.add(record.ResourceName);
-    }
-    const months = [...map.keys()].sort();
+    const months = [...new Set(filteredFacts.map((r) => r.date.substring(0, 7)))].sort();
     return months.map((m) => ({
       month: m,
-      count: map.get(m)!.size,
+      count: totalResourceCount,
     }));
-  }, [filteredData]);
+  }, [filteredFacts, totalResourceCount]);
 
   const resourceChangeLastMonth = useMemo(() => {
     const len = resourceCountByMonth.length;
@@ -160,7 +161,7 @@ export default function SummaryPage() {
               Effective Cost
             </CardTitle>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <DollarSign className="h-4 w-4 text-primary" />
+              <span className="text-xs font-bold text-primary">{currency}</span>
             </div>
           </CardHeader>
           <CardContent className="relative">
@@ -180,7 +181,7 @@ export default function SummaryPage() {
               List Cost
             </CardTitle>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">{currency}</span>
             </div>
           </CardHeader>
           <CardContent className="relative">

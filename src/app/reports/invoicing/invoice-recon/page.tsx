@@ -2,17 +2,17 @@
 
 import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
-import { groupBy } from "@/lib/data/cost-data";
+import { groupByDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
 
 export default function InvoiceReconPage() {
-  const { filteredData } = useReport();
+  const { filteredFacts } = useReport();
 
   const byMeterCategory = useMemo(
-    () => groupBy(filteredData, (r) => r.x_SkuMeterCategory),
-    [filteredData]
+    () => groupByDimension(filteredFacts, "x_SkuMeterCategory"),
+    [filteredFacts]
   );
 
   return (
