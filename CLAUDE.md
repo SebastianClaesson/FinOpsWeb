@@ -130,6 +130,10 @@ MSAL / Entra ID integration is planned. Design decisions to keep in mind:
 - Protected routes via middleware or layout-level auth checks
 - Token acquisition for Azure Cost Management API calls
 - Support for multi-tenant or single-tenant app registration
+- Support for access to data, this could be by Security Group claims or roles inside the app.
+- Access that follows least privileged, using users access to billing apis to list data
+- Admin role that can use system access to view billing data
+- permission management by mapping Security group/Roles to data on for example billung account, section, subscription or by tag
 
 ## FinOps Hubs Data Model
 
