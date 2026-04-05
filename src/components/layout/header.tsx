@@ -1,5 +1,7 @@
 import { branding } from "@/lib/config/branding";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AuthButton } from "@/components/auth/auth-button";
+import { TenantSelector } from "@/components/auth/tenant-selector";
 import { Settings } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,7 +33,9 @@ export function Header() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <TenantSelector />
+          <AuthButton />
           <Link
             href="/settings"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"

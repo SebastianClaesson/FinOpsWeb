@@ -433,3 +433,61 @@ Authentication is the key prerequisite that unlocks Governance pages, Workload O
 | Direct billing API data | Cost Management API tokens |
 | Multi-tenant support | Per-tenant token acquisition |
 | Scheduled report delivery | Service principal for unattended access |
+
+---
+
+## 18. Multi-Tenant Billing Architecture
+
+### Problem
+The app is registered in a single tenant, but must access billing data from multiple Azure tenants. This is common for MSPs, centralized FinOps teams, and organizations with multiple Entra ID tenants.
+
+### Architecture: Single-tenant app, multi-tenant data access
+
+```
+┌─────────────────────────────────────────────────────┐
+│ FinOpsWeb (home tenant)                             │
+│                                                     │
+│  App Registration (single-tenant)                   │
+│  Service Principal (for unattended/scheduled jobs)  │
+│                                                     │
+│  ┌──────────────────────────────────────┐           │
+│  │ Tenant Selector (header UI)          │           │
+│  │  ○ Home Tenant (direct access)       │           │
+│  │  ○ Tenant B (via Lighthouse / B2B)   │           │
+│  │  ○ Tenant C (via Lighthouse / B2B)   │           │
+│  └──────────────────────────────────────┘           │
+│                                                     │
+│  Per-tenant token acquisition:                      │
+│  ├─ User credentials → B2B guest token per tenant   │
+│  └─ Service principal → Lighthouse delegated access │
+│                                                     │
+│  API proxy routes:                                  │
+│  /api/azure/cost-data?tenantId=xxx                  │
+│  /api/azure/resource-graph?tenantId=xxx             │
+└─────────────────────────────────────────────────────┘
+```
+
+### Access methods
+
+**Azure Lighthouse (service principal)**
+- Target tenants onboard via Lighthouse delegation
+- Grants specific roles (Billing Reader, Cost Management Reader) on their scopes
+- No app registration needed in target tenant
+- Best for: MSP scenarios, centralized FinOps teams
+
+**B2B Guest Accounts (user credentials)**
+- User is invited as guest in target tenants
+- MSAL acquires a separate token per tenant using tenant-specific authority
+- Best for: users who already have cross-tenant guest access
+
+### Data isolation
+- Pre-aggregated data cached per tenant (separate cache files or IndexedDB stores)
+- Tenant selector in header switches the active data context
+- All reports automatically reflect the selected tenant's data
+
+### Prerequisites per target tenant
+| Item | Setup by |
+|---|---|
+| Lighthouse delegation (service principal access) | Target tenant admin |
+| B2B guest invite (user credential access) | Target tenant admin |
+| Billing Reader or Cost Management Reader role | Target tenant admin |

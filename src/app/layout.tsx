@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -41,6 +42,7 @@ export default function RootLayout({
     >
       <body className="flex h-full flex-col">
         <ThemeProvider>
+          <AuthProvider>
           <TooltipProvider>
             <Header />
             <div className="flex flex-1 overflow-hidden">
@@ -53,6 +55,7 @@ export default function RootLayout({
             </div>
             <MobileNav />
           </TooltipProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
