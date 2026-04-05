@@ -7,8 +7,10 @@ import {
   groupByDimension,
   groupFactsByDate,
   groupFactsByDateAndDimension,
+  detectAnomalies,
 } from "@/lib/data/fact-helpers";
 import { formatPercent, formatMonth } from "@/lib/utils/format";
+import Link from "next/link";
 import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { buildChartConfig, CHART_COLORS } from "@/lib/utils/chart-colors";
 import { loadSettings } from "@/lib/config/user-settings";
@@ -33,7 +35,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { TrendingUp, TrendingDown, Boxes, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, Target, AlertTriangle } from "lucide-react";
 
 export default function SummaryPage() {
   const { filteredFacts, resources } = useReport();
@@ -73,6 +75,16 @@ export default function SummaryPage() {
     () => groupFactsByDate(filteredFacts, "day").slice(-30),
     [filteredFacts]
   );
+
+  // Anomaly detection on last 30 days of data
+  const recentAnomalies = useMemo(() => {
+    const last30 = filteredFacts.filter((f) => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      return new Date(f.date) >= cutoff;
+    });
+    return detectAnomalies(last30, 30, 2.0).filter((p) => p.isAnomaly);
+  }, [filteredFacts]);
 
   // Month-over-month cost trend for the "last 6 months" comparison
   const monthlyTrend = useMemo(() => {
@@ -152,6 +164,23 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-6">
+      {/* Anomaly Banner */}
+      {recentAnomalies.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            {recentAnomalies.length} cost anomal{recentAnomalies.length === 1 ? "y" : "ies"} detected{" "}
+            &mdash;{" "}
+            <Link
+              href="/reports/cost-summary/anomalies"
+              className="font-medium underline underline-offset-4 hover:text-amber-900 dark:hover:text-amber-300"
+            >
+              View details
+            </Link>
+          </p>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Card className="relative overflow-hidden">

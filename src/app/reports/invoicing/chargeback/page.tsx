@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useReport } from "@/components/reports/report-context";
 import { groupByDimension, groupFactsByDateAndDimension } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
+import { ChargebackExport } from "@/components/export/chargeback-export";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
 import { formatMonth } from "@/lib/utils/format";
@@ -17,7 +18,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function ChargebackPage() {
   const { formatCurrency, formatCompact } = useCurrencyFormat();
-  const { filteredFacts } = useReport();
+  const { filteredFacts, filters, currency } = useReport();
 
   const bySubscription = useMemo(
     () => groupByDimension(filteredFacts, "SubAccountName"),
@@ -46,6 +47,15 @@ export default function ChargebackPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <ChargebackExport
+          bySubscription={bySubscription}
+          byResourceGroup={byResourceGroup}
+          dateRange={filters.dateRange}
+          currency={currency}
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">

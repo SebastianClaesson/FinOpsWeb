@@ -35,6 +35,8 @@ interface ReportContextValue {
   filteredFacts: CostFactRow[];
   filters: FilterState;
   setFilters: (filters: FilterState) => void;
+  amortizedView: boolean;
+  setAmortizedView: (v: boolean) => void;
   availableSubscriptions: string[];
   availableResourceGroups: string[];
   availableRegions: string[];
@@ -139,6 +141,8 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     loadData(true);
   };
 
+  const [amortizedView, setAmortizedView] = useState(false);
+
   const factTable = aggregated?.factTable ?? [];
 
   // Derive date range from fact table
@@ -193,10 +197,13 @@ export function ReportProvider({ children }: { children: ReactNode }) {
   useFilterSync(filters, setFilters, isLoading);
 
   // Apply filters to fact table
-  const filteredFacts = useMemo(
-    () => filterFactTable(factTable, filters),
-    [factTable, filters]
-  );
+  const filteredFacts = useMemo(() => {
+    let facts = filterFactTable(factTable, filters);
+    if (amortizedView) {
+      facts = facts.filter(f => f.ChargeCategory !== "Purchase");
+    }
+    return facts;
+  }, [factTable, filters, amortizedView]);
 
   // Detail tables (unfiltered — pages apply their own filtering)
   const resources = aggregated?.resources ?? [];
@@ -211,6 +218,8 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     filteredFacts,
     filters,
     setFilters,
+    amortizedView,
+    setAmortizedView,
     availableSubscriptions,
     availableResourceGroups,
     availableRegions,

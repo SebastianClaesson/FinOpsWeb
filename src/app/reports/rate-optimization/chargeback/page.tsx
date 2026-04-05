@@ -7,6 +7,7 @@ import {
   groupFactsByDateAndDimension,
 } from "@/lib/data/fact-helpers";
 import { CostTable } from "@/components/reports/cost-table";
+import { ChargebackExport } from "@/components/export/chargeback-export";
 import { formatMonth } from "@/lib/utils/format";
 import { useCurrencyFormat } from "@/lib/hooks/use-currency-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import { CHART_COLORS, buildChartConfig } from "@/lib/utils/chart-colors";
 
 export default function ChargebackPage() {
   const { formatCurrency, formatCompact } = useCurrencyFormat();
-  const { filteredFacts } = useReport();
+  const { filteredFacts, filters, currency } = useReport();
 
   const commitmentFacts = useMemo(
     () => filteredFacts.filter((f) => f.PricingCategory === "Commitment Discount"),
@@ -59,6 +60,15 @@ export default function ChargebackPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <ChargebackExport
+          bySubscription={bySubscription}
+          byResourceGroup={byResourceGroup}
+          dateRange={filters.dateRange}
+          currency={currency}
+        />
+      </div>
+
       {/* By Subscription */}
       <Card>
         <CardHeader>

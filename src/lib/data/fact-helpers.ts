@@ -237,3 +237,68 @@ export function getFactUniqueValues(
   }
   return [...set].sort();
 }
+
+// ---------------------------------------------------------------------------
+// Anomaly detection
+// ---------------------------------------------------------------------------
+
+export interface AnomalyPoint {
+  date: string;
+  cost: number;
+  mean: number;
+  stddev: number;
+  zScore: number;
+  isAnomaly: boolean;
+}
+
+/**
+ * Detect daily cost anomalies using a rolling window average + standard deviation.
+ * A day is flagged as an anomaly if its cost exceeds `mean + threshold * stddev`.
+ */
+export function detectAnomalies(
+  facts: CostFactRow[],
+  windowDays = 30,
+  threshold = 2.0
+): AnomalyPoint[] {
+  const daily = groupFactsByDate(facts, "day");
+  if (daily.length < 3) return [];
+
+  const result: AnomalyPoint[] = [];
+
+  for (let i = 0; i < daily.length; i++) {
+    // Compute rolling stats from the preceding window
+    const windowStart = Math.max(0, i - windowDays);
+    const window = daily.slice(windowStart, i);
+
+    if (window.length < 2) {
+      result.push({
+        date: daily[i].date,
+        cost: daily[i].effectiveCost,
+        mean: daily[i].effectiveCost,
+        stddev: 0,
+        zScore: 0,
+        isAnomaly: false,
+      });
+      continue;
+    }
+
+    const mean = window.reduce((sum, d) => sum + d.effectiveCost, 0) / window.length;
+    const variance = window.reduce((sum, d) => sum + (d.effectiveCost - mean) ** 2, 0) / window.length;
+    const stddev = Math.sqrt(variance);
+
+    const cost = daily[i].effectiveCost;
+    const zScore = stddev > 0 ? (cost - mean) / stddev : 0;
+    const isAnomaly = stddev > 0 && cost > mean + threshold * stddev;
+
+    result.push({
+      date: daily[i].date,
+      cost: Math.round(cost * 100) / 100,
+      mean: Math.round(mean * 100) / 100,
+      stddev: Math.round(stddev * 100) / 100,
+      zScore: Math.round(zScore * 100) / 100,
+      isAnomaly,
+    });
+  }
+
+  return result;
+}

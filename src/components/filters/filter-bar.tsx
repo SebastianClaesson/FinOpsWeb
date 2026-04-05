@@ -16,6 +16,8 @@ interface FilterBarProps {
   availableTagKeys?: Record<string, string[]>;
   tagFilters?: Record<string, string[]>;
   onTagFiltersChange?: (tagFilters: Record<string, string[]>) => void;
+  amortizedView?: boolean;
+  onAmortizedChange?: (v: boolean) => void;
 }
 
 export function FilterBar({
@@ -29,6 +31,8 @@ export function FilterBar({
   availableTagKeys,
   tagFilters,
   onTagFiltersChange,
+  amortizedView,
+  onAmortizedChange,
 }: FilterBarProps) {
   const hasActiveFilters =
     filters.subscriptions.length > 0 ||
@@ -146,6 +150,19 @@ export function FilterBar({
               }
             />
           ))}
+        </div>
+      )}
+
+      {/* Amortized view toggle */}
+      {onAmortizedChange && (
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Amortized</label>
+          <button
+            onClick={() => onAmortizedChange(!amortizedView)}
+            className={`relative h-5 w-9 rounded-full transition-colors ${amortizedView ? 'bg-primary' : 'bg-input'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${amortizedView ? 'translate-x-4' : ''}`} />
+          </button>
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import { Suspense, type ReactNode } from "react";
 function ReportShell({ children }: { children: ReactNode }) {
   const {
     filteredFacts, filters, setFilters,
+    amortizedView, setAmortizedView,
     availableSubscriptions, availableResourceGroups, availableRegions,
     availableServices, availableCommitmentTypes, availableTagKeys,
   } = useReport();
@@ -32,6 +33,8 @@ function ReportShell({ children }: { children: ReactNode }) {
         availableServices={availableServices}
         availableCommitmentTypes={availableCommitmentTypes}
         availableTagKeys={availableTagKeys}
+        amortizedView={amortizedView}
+        onAmortizedChange={setAmortizedView}
       />
       <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
         {children}
