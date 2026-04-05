@@ -6,12 +6,21 @@
 import fs from "fs";
 import path from "path";
 import { parseAndAggregate } from "./csv-stream-parser";
+import { parseParquetAndAggregate } from "./parquet-parser";
 import { createMaps, finalizeAggregation } from "./aggregate";
 import { PreAggregatedData } from "@/lib/types/aggregated";
 import { parseManifest, type ExportMetadata } from "@/lib/types/focus-manifest";
 
+function isDataFile(name: string): boolean {
+  return name.endsWith(".csv") || name.endsWith(".parquet");
+}
+
 function isCsvFile(name: string): boolean {
   return name.endsWith(".csv");
+}
+
+function isParquetFile(name: string): boolean {
+  return name.endsWith(".parquet");
 }
 
 function getExportsDir(): string {
@@ -27,7 +36,7 @@ export function listExportFiles(): { name: string; size: number; modified: Date 
 
   return fs
     .readdirSync(dir)
-    .filter(isCsvFile)
+    .filter(isDataFile)
     .map((name) => {
       const stat = fs.statSync(path.join(dir, name));
       return { name, size: stat.size, modified: stat.mtime };
@@ -78,14 +87,14 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
     return finalizeAggregation(maps, "csv", [], false);
   }
 
-  const csvFiles = fs
+  const dataFiles = fs
     .readdirSync(dir)
-    .filter(isCsvFile)
+    .filter(isDataFile)
     .sort();
 
   // Try disk cache first
   const cachePath = getCachePath();
-  if (isCacheValid(cachePath, csvFiles, dir)) {
+  if (isCacheValid(cachePath, dataFiles, dir)) {
     try {
       const cached = JSON.parse(fs.readFileSync(cachePath, "utf-8")) as PreAggregatedData;
       console.log(`[focus-file-loader] Loaded from cache (${cached.factTable.length} fact rows)`);
@@ -95,8 +104,8 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
     }
   }
 
-  // Parse CSVs and aggregate
-  console.log(`[focus-file-loader] Parsing ${csvFiles.length} CSV files...`);
+  // Parse data files and aggregate
+  console.log(`[focus-file-loader] Parsing ${dataFiles.length} data files...`);
   const maps = createMaps();
   const loadedFiles: string[] = [];
   const allErrors: string[] = [];
@@ -104,7 +113,7 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
   let totalRows = 0;
   let truncated = false;
 
-  for (const file of csvFiles) {
+  for (const file of dataFiles) {
     const remaining = globalMax - totalRows;
     if (remaining <= 0) {
       truncated = true;
@@ -115,7 +124,14 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
     const filePath = path.join(dir, file);
 
     try {
-      const result = await parseAndAggregate(filePath, maps, remaining);
+      let result: { rowCount: number; errors: string[]; truncated: boolean };
+
+      if (isParquetFile(file)) {
+        result = await parseParquetAndAggregate(filePath, maps, remaining);
+      } else {
+        result = await parseAndAggregate(filePath, maps, remaining);
+      }
+
       totalRows += result.rowCount;
       loadedFiles.push(file);
 
@@ -173,5 +189,5 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
 export function hasExportFiles(): boolean {
   const dir = getExportsDir();
   if (!fs.existsSync(dir)) return false;
-  return fs.readdirSync(dir).some(isCsvFile);
+  return fs.readdirSync(dir).some(isDataFile);
 }

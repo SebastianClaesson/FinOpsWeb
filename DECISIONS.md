@@ -272,24 +272,13 @@ Report pages are scaffolded with navigation and layout but many are still placeh
 
 | Report Group | Page | Status |
 |---|---|---|
-| **Cost Summary** | Summary, Services, Subscriptions, Resource Groups, Regions, Charge Breakdown, Running Total, Resources, Inventory, Prices, Purchases, Usage Analysis, Data Quality | Done |
+| **Cost Summary** | Summary, Services, Subscriptions, Resource Groups, Regions, Charge Breakdown, Running Total, Resources (grouped by type), Inventory, Prices, Purchases, Usage Analysis, Tag Compliance, Data Quality | Done |
 | **Invoicing** | Summary, Chargeback, Invoice Recon, Services, Tags, Prices, Purchases | Done |
-| **Rate Optimization** | Summary | Done |
+| **Rate Optimization** | Summary, Total Savings, Commitment Savings, Utilization, Chargeback, Purchases, Prices, Resources, Hybrid Benefit, Recommendations | Done |
 
-### Placeholder — needs implementation
+### Placeholder — blocked on external APIs
 
-**Rate Optimization** (9 pages — requires commitment discount data in FOCUS exports):
-- `commitment-savings` — Savings from reservations/savings plans over time
-- `chargeback` — Commitment discount chargeback allocation
-- `hybrid-benefit` — Azure Hybrid Benefit usage tracking
-- `prices` — Rate-specific price sheet analysis
-- `purchases` — Reservation/savings plan purchase history
-- `recommendations` — Reservation purchase recommendations (may need Azure Advisor API)
-- `resources` — Resources covered by commitments
-- `total-savings` — Total savings breakdown by discount type
-- `utilization` — Commitment utilization tracking
-
-**Governance** (5 pages — requires Azure Resource Graph API):
+**Governance** (6 pages — requires Azure Resource Graph API + MSAL auth):
 - `page.tsx` (summary) — Governance overview dashboard
 - `managed-disks` — Disk tier and encryption compliance
 - `network-security` — NSG rules and public IP audit
@@ -297,66 +286,57 @@ Report pages are scaffolded with navigation and layout but many are still placeh
 - `sql-databases` — SQL tier and security configuration
 - `virtual-machines` — VM sizing, generation, and configuration audit
 
-**Workload Optimization** (2 pages — requires Azure Advisor API):
+**Workload Optimization** (2 pages — requires Azure Advisor API + MSAL auth):
 - `page.tsx` (summary) — Optimization opportunities overview
 - `unattached-disks` — Orphaned/unattached disk detection
 
 ### Implementation notes
-- Rate Optimization pages can be built using existing `purchases`, `prices`, and `factTable` data from the pre-aggregation layer. Most need filtering by `CommitmentDiscountType` and `PricingCategory`.
-- Governance and Workload Optimization pages require external Azure APIs (Resource Graph, Advisor) that are not yet integrated. These are blocked on the authentication/MSAL work (see CLAUDE.md Phase 3).
-- Priority: Rate Optimization pages first (data already available), then Governance/Workload after auth integration.
+- Rate Optimization: Hybrid Benefit page approximates AHUB from commitment data; full tracking needs `x_PricingSubcategory` in the fact table. Recommendations page shows on-demand spend analysis; full recommendations need Azure Advisor API.
+- Governance and Workload Optimization pages are blocked on the MSAL authentication milestone (see section 17).
 
 ---
 
 ## 15. Feature Roadmap — Planned Enhancements
+
+### Completed
+
+- ~~Data freshness indicator~~ — Export date range shown in cost-summary header, parsed from manifest.json
+- ~~URL-shareable filter state~~ — Filters sync to URL search params via `useFilterSync` hook
+- ~~Tagging compliance report~~ — New page at `/reports/cost-summary/tag-compliance` with compliance scores, configurable required tags, untagged resource drill-down
+- ~~Savings plan / reservation coverage~~ — Built as the Rate Optimization > Utilization page
 
 ### High priority (can be built with existing data)
 
 **1. Anomaly detection / cost alerts**
 Flag unusual daily spend spikes compared to historical baseline (e.g., > 2 standard deviations from 30-day average). No external APIs needed — statistical analysis on the fact table. Could surface as a banner on the Summary page and a dedicated Anomalies page.
 
-**2. Tagging compliance report**
-Show what percentage of resources have required tags (e.g., `CostCenter`, `Owner`, `Environment`). Very common FinOps requirement. Can be built from the existing `resources` detail table (which includes parsed tags) and `tagCosts`. Display as a compliance score card with drill-down into untagged resources.
-
-**3. Amortized cost view**
+**2. Amortized cost view**
 Reservation/savings plan purchases appear as one-time spikes in the current view. An amortized view spreads the cost over the commitment term. The FOCUS spec supports this via `ChargeCategory` + `ChargeSubcategory` + `PricingCategory`. Add a toggle to switch between actual and amortized cost views across all reports.
-
-**4. Savings plan / reservation coverage**
-What percentage of eligible usage is covered by commitments? Compare `PricingCategory = "On-Demand"` vs `"Commitment Discount"` ratios over time. Feeds into the Rate Optimization > Utilization placeholder page. Key metric for FinOps teams evaluating whether to buy more reservations.
-
-**5. Data freshness indicator**
-Show when the CSV data was last exported/updated. The `manifest.json` from Azure Cost Management exports contains this metadata. Surface it in the header/status bar so users know how current their data is. Already parsed by the upload flow but not displayed.
-
-**6. URL-shareable filter state**
-Encode filter selections (date range, subscriptions, regions, etc.) in URL search params so users can share a specific filtered view via link. Already noted as an open question in the codebase — implement using Next.js `useSearchParams` with bidirectional sync to filter state.
 
 ### Medium priority (needs additional data model work)
 
-**7. Showback/chargeback export**
+**3. Showback/chargeback export**
 Generate formatted chargeback reports (PDF/Excel) that finance teams can distribute to cost center owners. The Invoicing > Chargeback page already groups by subscription — add an export button that produces a branded, print-ready document with per-cost-center breakdowns, monthly trends, and totals.
 
-**8. Parquet file support**
-Azure Cost Management exports increasingly use Parquet format (smaller files, faster parsing). Currently only CSV is supported. Adding Parquet ingestion via a WASM-based parser (e.g., `parquet-wasm` or DuckDB-WASM) would future-proof the data pipeline and reduce parse times significantly.
+**4. Parquet file support**
+Azure Cost Management exports increasingly use Parquet format (smaller files, faster parsing). Currently only CSV is supported. Adding Parquet ingestion would future-proof the data pipeline and reduce parse times significantly.
 
-**9. Multi-tenant / multi-billing-account support**
+**5. Multi-tenant / multi-billing-account support**
 The current app assumes a single dataset. Enterprise customers often have multiple billing accounts or EA enrollments. The FOCUS schema includes `BillingAccountId` and `BillingAccountName` — add a top-level account switcher that filters all reports to a selected billing account. May require partitioned storage in IndexedDB or separate API endpoints per account.
 
 ### Lower priority (needs external integrations)
 
-**10. Scheduled report delivery**
+**6. Scheduled report delivery**
 Email or Teams webhook with a summary snapshot (e.g., weekly cost digest). Common ask from FinOps practitioners who don't check dashboards daily. Requires a backend scheduler (Azure Functions timer trigger or similar) and a rendering pipeline to produce the digest. Blocked on authentication and a persistent backend.
 
 ### Implementation order suggestion
-1. Data freshness indicator (quick win, metadata already available)
-2. URL-shareable filter state (improves collaboration, no data changes)
-3. Tagging compliance report (new page, uses existing data)
-4. Anomaly detection (new page + Summary banner, uses existing data)
-5. Amortized cost view (toggle across reports, needs data model consideration)
-6. Savings plan / reservation coverage (feeds Rate Optimization pages)
-7. Showback/chargeback export (PDF generation dependency)
-8. Parquet support (new parser dependency)
-9. Multi-tenant support (architecture change)
-10. Scheduled report delivery (requires backend infrastructure)
+1. Anomaly detection (new page + Summary banner, uses existing data)
+2. Amortized cost view (toggle across reports, needs data model consideration)
+3. Parquet file support (new parser dependency)
+4. Showback/chargeback export (PDF generation dependency)
+5. MSAL / Entra ID authentication (see section 17 — unlocks Governance + Workload)
+6. Multi-tenant support (architecture change)
+7. Scheduled report delivery (requires backend infrastructure)
 
 ---
 
@@ -393,3 +373,63 @@ Several report pages are blocked or limited without Azure Advisor and Resource G
 - **Recommendations page** shows on-demand spend analysis to help identify commitment opportunities manually
 - **Hybrid Benefit page** shows commitment discount breakdown by service as a proxy
 - **Governance/Workload pages** remain as `<ComingSoon>` placeholders
+
+---
+
+## 17. MSAL / Entra ID Authentication Milestone
+
+Authentication is the key prerequisite that unlocks Governance pages, Workload Optimization, direct Azure API access, and role-based data access. This is the largest remaining milestone.
+
+### Packages
+- `@azure/msal-browser` — Browser-based auth flows (redirect, popup, silent)
+- `@azure/msal-react` — React hooks and components (`useMsal`, `AuthenticatedTemplate`, etc.)
+
+### Implementation phases
+
+**Phase 1: Basic auth flow**
+- Create `src/lib/config/auth.ts` with MSAL configuration (client ID, authority, redirect URI, scopes)
+- App registration in Entra ID (single-tenant or multi-tenant)
+- Add `MsalProvider` wrapper to the root layout
+- Protected routes via layout-level auth check or Next.js middleware
+- Login/logout UI in the header
+
+**Phase 2: Token acquisition for Azure APIs**
+- Acquire tokens for Azure Cost Management API (`https://management.azure.com/.default`)
+- Acquire tokens for Azure Resource Graph
+- Server-side API proxy routes (`/api/azure/cost-management`, `/api/azure/resource-graph`, `/api/azure/advisor`)
+- Token caching and silent refresh
+
+**Phase 3: Role-based access control**
+- **Least privilege**: Use the user's own Azure RBAC to determine what billing data they can see
+- **Admin role**: App-level admin can use a system identity (managed identity or service principal) to access billing data on behalf of users
+- **Security group mapping**: Map Entra ID security groups or app roles to data scopes:
+  - Billing Account level access
+  - Invoice Section level access
+  - Subscription level access
+  - Tag-based access (e.g., CostCenter = "Engineering")
+- Permission management UI in the Settings page
+
+**Phase 4: Direct API data sources**
+- Replace CSV file loading with Azure Cost Management REST API calls
+- Support for MCA (Microsoft Customer Agreement) billing hierarchy:
+  ```
+  Billing Account → Billing Profile → Invoice Section → Subscription → Resource Group → Resource
+  ```
+- Cache API responses server-side to avoid rate limits
+- Combine with existing CSV upload as a fallback/alternative data source
+
+### Entra ID app registration requirements
+- **Redirect URIs**: `http://localhost:3000` (dev), production URL
+- **API permissions**: `Azure Service Management > user_impersonation`, `Microsoft Graph > User.Read`
+- **Supported account types**: Depends on deployment (single-tenant for internal, multi-tenant for SaaS)
+- **Client secret or certificate**: For server-side token acquisition (API proxy routes)
+
+### What this unblocks
+| Feature | Dependency |
+|---|---|
+| 6 Governance pages | Resource Graph API tokens |
+| 2 Workload Optimization pages | Advisor API tokens |
+| Full reservation recommendations | Advisor API tokens |
+| Direct billing API data | Cost Management API tokens |
+| Multi-tenant support | Per-tenant token acquisition |
+| Scheduled report delivery | Service principal for unattended access |

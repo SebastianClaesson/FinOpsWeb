@@ -160,7 +160,7 @@ export function CsvUpload({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.csv.gz,.gz,.json"
+            accept=".csv,.csv.gz,.gz,.json,.parquet"
             multiple
             className="hidden"
             onChange={(e) => e.target.files && handleFiles(e.target.files)}
