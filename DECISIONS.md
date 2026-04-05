@@ -357,3 +357,39 @@ Email or Teams webhook with a summary snapshot (e.g., weekly cost digest). Commo
 8. Parquet support (new parser dependency)
 9. Multi-tenant support (architecture change)
 10. Scheduled report delivery (requires backend infrastructure)
+
+---
+
+## 16. Azure Advisor API Integration Milestone
+
+Several report pages are blocked or limited without Azure Advisor and Resource Graph API data. This is a prerequisite milestone that must be completed before these reports can be fully implemented.
+
+### Reports requiring Azure Advisor API
+| Report | Page | What's Missing |
+|---|---|---|
+| **Rate Optimization** | Recommendations | Reservation/savings plan purchase recommendations (VM, SQL, App Service sizing) |
+| **Rate Optimization** | Hybrid Benefit | Full AHUB license tracking (currently approximated from commitment data) |
+| **Workload Optimization** | Summary | Right-sizing, idle resource, and cost optimization recommendations |
+| **Workload Optimization** | Unattached Disks | Orphaned disk detection and cleanup recommendations |
+
+### Reports requiring Azure Resource Graph API
+| Report | Page | What's Missing |
+|---|---|---|
+| **Governance** | All 6 pages | Resource inventory, compliance state, NSG rules, VM config, SQL config, disk encryption |
+
+### Prerequisites
+1. **MSAL / Entra ID authentication** — Required to obtain tokens for Azure API calls
+2. **API proxy routes** — Next.js Route Handlers to call Azure APIs server-side (secrets stay off client)
+3. **Permission model** — User must have Reader role on subscriptions or Advisor Contributor for recommendations
+
+### Implementation approach
+1. Implement MSAL auth (see CLAUDE.md Authentication section)
+2. Add API proxy routes: `/api/azure/advisor`, `/api/azure/resource-graph`
+3. Create a shared Azure API client with token caching and retry logic
+4. Extend report context with Advisor/Resource Graph data (separate from cost data — different refresh cadence)
+5. Populate the blocked report pages with real data
+
+### Current workarounds
+- **Recommendations page** shows on-demand spend analysis to help identify commitment opportunities manually
+- **Hybrid Benefit page** shows commitment discount breakdown by service as a proxy
+- **Governance/Workload pages** remain as `<ComingSoon>` placeholders

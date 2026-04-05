@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useReport } from "@/components/reports/report-context";
 import { PurchaseDetail } from "@/lib/types/aggregated";
 import { formatDate } from "@/lib/utils/format";
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Info } from "lucide-react";
 import { useSortableTable } from "@/components/reports/sortable-header";
 
@@ -31,8 +32,9 @@ interface PurchaseRow {
 export default function PurchasesPage() {
   const { purchases: purchaseDetails } = useReport();
   const { formatCurrency } = useCurrencyFormat();
+  const [activeOnly, setActiveOnly] = useState(true);
 
-  const purchases = useMemo(() => {
+  const allPurchases = useMemo(() => {
     return purchaseDetails.map((p: PurchaseDetail) => ({
       id: p.CommitmentDiscountId,
       name: p.CommitmentDiscountName,
@@ -44,9 +46,16 @@ export default function PurchasesPage() {
     }));
   }, [purchaseDetails]);
 
+  const purchases = useMemo(() => {
+    if (!activeOnly) return allPurchases;
+    return allPurchases.filter((p) => Math.round(p.totalCost * 100) !== 0);
+  }, [allPurchases, activeOnly]);
+
+  const hiddenCount = allPurchases.length - purchases.length;
+
   const { sorted, SortHeader } = useSortableTable(purchases, "totalCost");
 
-  if (purchases.length === 0) {
+  if (allPurchases.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center gap-2 py-8 text-muted-foreground">
@@ -61,9 +70,23 @@ export default function PurchasesPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Commitment Discounts &amp; Purchases ({purchases.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">
+              Commitment Discounts &amp; Purchases ({purchases.length})
+            </CardTitle>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Switch
+                checked={activeOnly}
+                onCheckedChange={(checked) => setActiveOnly(checked)}
+              />
+              <span>Active only</span>
+              {activeOnly && hiddenCount > 0 && (
+                <span className="text-xs">
+                  ({hiddenCount} hidden)
+                </span>
+              )}
+            </label>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-lg border">
@@ -79,7 +102,13 @@ export default function PurchasesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sorted.map((p) => (
+                {sorted.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                      All purchases hidden by filter. Toggle &quot;Active only&quot; to show expired reservations.
+                    </TableCell>
+                  </TableRow>
+                ) : sorted.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell><Badge variant="outline">{p.type}</Badge></TableCell>

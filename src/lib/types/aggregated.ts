@@ -127,5 +127,7 @@ export interface PreAggregatedData {
     files: string[];
     totalRawRecords: number;
     truncated: boolean;
+    /** Parsed manifest metadata from the most recent export. */
+    manifest?: import("@/lib/types/focus-manifest").ExportMetadata;
   };
 }

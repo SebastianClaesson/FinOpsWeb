@@ -18,6 +18,7 @@ function ReportShell({ children }: { children: ReactNode }) {
     availableTagKeys,
     dataQuality,
     currency,
+    manifest,
     dataSource,
     dataFiles,
     isLoading,
@@ -68,6 +69,15 @@ function ReportShell({ children }: { children: ReactNode }) {
             )}
             {" "}&middot;{" "}
             <span className="font-mono text-xs">{currency}</span>
+            {manifest && (
+              <>
+                {" "}&middot;{" "}
+                <span className="font-mono text-xs text-blue-600 dark:text-blue-400" title={`Exported ${new Date(manifest.submittedAt).toLocaleString()}`}>
+                  Data: {new Date(manifest.startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                  –{new Date(manifest.endDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+              </>
+            )}
             {dataSource === "dummy" && (
               <>
                 {" "}&middot;{" "}

@@ -19,7 +19,9 @@ import {
   TagCostRow,
   DataQualityStats,
 } from "@/lib/types/aggregated";
+import { type ExportMetadata } from "@/lib/types/focus-manifest";
 import { filterFactTable } from "@/lib/data/fact-helpers";
+import { useFilterSync } from "@/lib/hooks/use-filter-sync";
 import {
   fetchCostData,
   uploadCsvFiles,
@@ -48,6 +50,8 @@ interface ReportContextValue {
   dataQuality: DataQualityStats;
   /** Detected billing currency from the data (e.g. "SEK", "USD") */
   currency: string;
+  /** Export manifest metadata (data freshness) */
+  manifest: ExportMetadata | null;
   /** "csv" | "csv-upload" | "dummy" — indicates where data was loaded from */
   dataSource: "csv" | "csv-upload" | "dummy" | "loading";
   /** Files loaded (when source is csv) */
@@ -185,6 +189,9 @@ export function ReportProvider({ children }: { children: ReactNode }) {
   const availableCommitmentTypes = filterOptions?.commitmentTypes ?? [];
   const availableTagKeys = filterOptions?.tagKeysAndValues ?? {};
 
+  // Sync filters with URL search params
+  useFilterSync(filters, setFilters, isLoading);
+
   // Apply filters to fact table
   const filteredFacts = useMemo(
     () => filterFactTable(factTable, filters),
@@ -217,6 +224,7 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     tagCosts,
     dataQuality,
     currency: detectedCurrency,
+    manifest: aggregated?.meta.manifest ?? null,
     dataSource,
     dataFiles,
     isLoading,

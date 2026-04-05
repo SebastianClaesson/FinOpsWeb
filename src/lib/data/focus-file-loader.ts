@@ -8,6 +8,7 @@ import path from "path";
 import { parseAndAggregate } from "./csv-stream-parser";
 import { createMaps, finalizeAggregation } from "./aggregate";
 import { PreAggregatedData } from "@/lib/types/aggregated";
+import { parseManifest, type ExportMetadata } from "@/lib/types/focus-manifest";
 
 function isCsvFile(name: string): boolean {
   return name.endsWith(".csv");
@@ -131,6 +132,24 @@ export async function loadAllExportsAggregated(): Promise<PreAggregatedData> {
   }
 
   const data = finalizeAggregation(maps, "csv", loadedFiles, truncated);
+
+  // Read manifest files for data freshness metadata
+  const manifestFiles = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".json") && f.toLowerCase().includes("manifest"));
+  let latestManifest: ExportMetadata | undefined;
+  for (const mf of manifestFiles) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, mf), "utf-8"));
+      const parsed = parseManifest(raw);
+      if (parsed) {
+        if (!latestManifest || parsed.submittedAt > latestManifest.submittedAt) {
+          latestManifest = parsed;
+        }
+      }
+    } catch { /* skip invalid manifests */ }
+  }
+  if (latestManifest) {
+    data.meta.manifest = latestManifest;
+  }
 
   if (allErrors.length > 0) {
     console.warn("[focus-file-loader] Errors:", allErrors);
