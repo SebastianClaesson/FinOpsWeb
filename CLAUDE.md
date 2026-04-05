@@ -122,18 +122,41 @@ The application supports customizable branding:
 - **Company logo/icon** — placed in `public/branding/`, referenced in config
 - **Theme colors** — configurable via Tailwind/CSS custom properties
 
-## Authentication (Future)
+## Authentication
 
-MSAL / Entra ID integration is planned. Design decisions to keep in mind:
-- Use `@azure/msal-browser` and `@azure/msal-react` packages
-- Auth config will live in `src/lib/config/auth.ts`
-- Protected routes via middleware or layout-level auth checks
-- Token acquisition for Azure Cost Management API calls
-- Support for multi-tenant or single-tenant app registration
-- Support for access to data, this could be by Security Group claims or roles inside the app.
-- Access that follows least privileged, using users access to billing apis to list data
-- Admin role that can use system access to view billing data
-- permission management by mapping Security group/Roles to data on for example billung account, section, subscription or by tag
+MSAL / Entra ID authentication is implemented but runs in **anonymous mode** by default (no env vars = no auth UI, app works with CSV data only).
+
+### Setup
+1. Copy `.env.example` to `.env.local`
+2. Create an Entra ID app registration (single-tenant):
+   - Redirect URI: `http://localhost:3000` (SPA type)
+   - API permissions: `Azure Service Management > user_impersonation`, `Microsoft Graph > User.Read`
+3. Fill in `.env.local`:
+   ```
+   NEXT_PUBLIC_AZURE_CLIENT_ID=your-client-id
+   NEXT_PUBLIC_AZURE_TENANT_ID=your-tenant-id
+   NEXT_PUBLIC_AZURE_TENANT_NAME=Your Org Name
+   AZURE_CLIENT_SECRET=your-secret  # optional, for service principal flows
+   ```
+4. Restart dev server — Sign In button appears in header
+
+### Architecture
+- **Single-tenant app registration**, multi-tenant data access via Azure Lighthouse or B2B guest accounts
+- `src/lib/config/auth.ts` — MSAL configuration (reads env vars)
+- `src/components/auth/auth-provider.tsx` — MsalProvider wrapper (no-ops without config)
+- `src/components/auth/auth-button.tsx` — Login/logout popup flow
+- `src/components/auth/tenant-selector.tsx` — Switch between configured tenants
+- `src/lib/azure/token-service.ts` — Per-tenant token acquisition (user or service principal)
+- `src/app/api/azure/proxy/route.ts` — Server-side API proxy (keeps client secret server-side)
+- `src/lib/config/tenants.ts` — Tenant registry (env vars + localStorage)
+
+### Access control (planned)
+- Least privilege: use user's own Azure RBAC to determine visible billing data
+- Admin role: app-level admin using system identity (managed identity or service principal)
+- Security group mapping: Entra ID groups/app roles → data scopes (billing account, invoice section, subscription, tag)
+- Permission management UI in Settings page
+
+See DECISIONS.md sections 17-18 for full architecture details.
 
 ## FinOps Hubs Data Model
 
@@ -142,20 +165,27 @@ https://learn.microsoft.com/en-us/cloud-computing/finops/toolkit/hubs/data-model
 
 The Hubs pipeline normalizes Azure Cost Management exports into a standardized schema before Power BI consumes it. Our ingestion layer should be compatible with this model.
 
-## Data Sources (Roadmap)
+## Data Sources
 
-### Phase 1 (Current): Static Dummy Data
-- FOCUS-format JSON files in `src/data/dummy/`
-- Open data lookups (Regions, Services, ResourceTypes) in `src/data/open-data/`
+### Phase 1 (Current): CSV/Parquet Exports + Dummy Data
+- **CSV streaming** — FOCUS CSV exports parsed server-side with PapaParse streaming, aggregated into compact fact table during parse (~5 MB output from ~1 GB input)
+- **Parquet support** — FOCUS Parquet exports parsed with hyparquet (pure JS, zero deps)
+- **Pre-aggregation** — Server never holds raw records in memory; disk cache (`.aggregated-cache.json`) for instant subsequent loads
+- **Browser upload** — Drag & drop CSV/Parquet files, parsed in browser, stored in IndexedDB
+- **Dummy data** — Generated FOCUS-format data as fallback when no exports exist
+- **Open data lookups** — FinOps Toolkit data (Regions, Services, ResourceTypes) in `src/data/open-data/`
 
-### Phase 2: Azure Export Ingestion
-- Parse Cost Management exports (CSV) uploaded or pointed to via Azure Blob Storage
+### Phase 2 (Ready): Azure Export Ingestion via Azure Blob Storage
+- Point `FOCUS_EXPORTS_DIR` to a mounted Azure Blob container or synced directory
 - Support FOCUS 1.0 and 1.0-preview schemas
+- Manifest.json metadata displayed as data freshness indicator
 
-### Phase 3: Azure Billing APIs
+### Phase 3 (Auth foundation built): Azure Billing APIs
 - Direct API calls to Azure Cost Management REST APIs
-- Requires MSAL authentication (Entra ID)
-- MCA (Microsoft Customer Agreement) billing account support
+- MSAL authentication implemented (see Authentication section above)
+- API proxy route (`/api/azure/proxy`) supports user token passthrough and service principal
+- Multi-tenant access via Lighthouse delegation or B2B guest accounts
+- MCA (Microsoft Customer Agreement) billing hierarchy support
 
 ## Coding Conventions
 
