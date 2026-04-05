@@ -304,39 +304,101 @@ Report pages are scaffolded with navigation and layout but many are still placeh
 - ~~URL-shareable filter state~~ — Filters sync to URL search params via `useFilterSync` hook
 - ~~Tagging compliance report~~ — New page at `/reports/cost-summary/tag-compliance` with compliance scores, configurable required tags, untagged resource drill-down
 - ~~Savings plan / reservation coverage~~ — Built as the Rate Optimization > Utilization page
+- ~~Anomaly detection / cost alerts~~ — Anomalies page with timeline chart + threshold slider, banner on Summary page
+- ~~Amortized cost view~~ — Global toggle in filter bar, excludes Purchase charges from all reports
+- ~~Showback/chargeback PDF export~~ — Print-optimized branded report on both chargeback pages
+- ~~Parquet file support~~ — hyparquet parser, auto-detected alongside CSV in exports dir
+- ~~MSAL / Entra ID auth foundation~~ — AuthProvider, login/logout, tenant selector, API proxy (anonymous mode until configured)
 
-### High priority (can be built with existing data)
+### Open — can be built with existing data
 
-**1. Anomaly detection / cost alerts**
-Flag unusual daily spend spikes compared to historical baseline (e.g., > 2 standard deviations from 30-day average). No external APIs needed — statistical analysis on the fact table. Could surface as a banner on the Summary page and a dedicated Anomalies page.
+**1. Cost forecasting**
+Project next month's spend based on historical trend. Linear regression or exponential smoothing on the daily fact table. Show as a dashed "forecast" line on the Summary daily trend chart and a dedicated Forecasting page with confidence intervals.
 
-**2. Amortized cost view**
-Reservation/savings plan purchases appear as one-time spikes in the current view. An amortized view spreads the cost over the commitment term. The FOCUS spec supports this via `ChargeCategory` + `ChargeSubcategory` + `PricingCategory`. Add a toggle to switch between actual and amortized cost views across all reports.
+**2. Budget alerts with thresholds**
+Budgets exist in the Settings page but lack threshold warnings. Add configurable alert levels (80%, 90%, 100%) that show as colored bands on budget progress bars. Surface warnings as banners on the Summary page when thresholds are crossed.
 
-### Medium priority (needs additional data model work)
+**3. Currency conversion toggle**
+The FOCUS data includes `x_BillingExchangeRate` and `x_*CostInUsd` fields. Add a "View in USD" toggle that switches all cost displays to the USD-equivalent values. Useful for multi-currency environments where leadership needs a single-currency view.
 
-**3. Showback/chargeback export**
-Generate formatted chargeback reports (PDF/Excel) that finance teams can distribute to cost center owners. The Invoicing > Chargeback page already groups by subscription — add an export button that produces a branded, print-ready document with per-cost-center breakdowns, monthly trends, and totals.
+**4. Saved filter presets**
+Let users name and save filter combinations (e.g., "Q1 Production", "Dev Europe"). Store in localStorage. Show as a dropdown in the filter bar for quick switching. Complements the URL-shareable filters.
 
-**4. Parquet file support**
-Azure Cost Management exports increasingly use Parquet format (smaller files, faster parsing). Currently only CSV is supported. Adding Parquet ingestion would future-proof the data pipeline and reduce parse times significantly.
+**5. Dashboard customization**
+Let users pin, reorder, or hide KPI cards and charts on the Summary page. Store layout preferences in localStorage. Default layout stays as-is for new users.
 
-**5. Multi-tenant / multi-billing-account support**
-The current app assumes a single dataset. Enterprise customers often have multiple billing accounts or EA enrollments. The FOCUS schema includes `BillingAccountId` and `BillingAccountName` — add a top-level account switcher that filters all reports to a selected billing account. May require partitioned storage in IndexedDB or separate API endpoints per account.
+**6. Commitment planner / what-if calculator**
+"If I buy X reservation, how much would I save?" Based on historical on-demand spend by service, compute potential savings at various coverage levels (50%, 70%, 90%). Renders as an interactive chart with a coverage slider.
 
-### Lower priority (needs external integrations)
+**7. Data retention / archival**
+What happens with 12+ months of exports? Options: automatic rollup of old months into monthly summaries, configurable retention window, or archive old exports to a separate directory. Prevents unbounded cache growth.
 
-**6. Scheduled report delivery**
-Email or Teams webhook with a summary snapshot (e.g., weekly cost digest). Common ask from FinOps practitioners who don't check dashboards daily. Requires a backend scheduler (Azure Functions timer trigger or similar) and a rendering pipeline to produce the digest. Blocked on authentication and a persistent backend.
+### Open — needs additional infrastructure
+
+**8. Multi-tenant / multi-billing-account support**
+Auth foundation and tenant selector built. Still needs: billing account list API call, data partitioning per tenant (separate cache files / IndexedDB stores), tenant management UI in Settings.
+
+**9. Scheduled report delivery**
+Email or Teams webhook with a weekly cost digest. Options: Azure Functions timer trigger, Logic Apps, or GitHub Actions cron. Needs service principal for unattended access. Blocked on auth configuration.
+
+**10. Notification / alert rules**
+Anomaly detection exists but has no notification delivery. Add configurable alert rules: "notify me when daily spend exceeds X" or "when anomaly detected". Delivery via email (SendGrid / Azure Communication Services) or Teams webhook. Blocked on backend scheduler.
+
+**11. Automated export sync**
+Instead of manual azcopy, build a scheduled job (Azure Functions or Next.js cron route) that pulls new exports from Blob Storage automatically. Would eliminate the manual download step from the setup guide.
+
+### Open — needs auth + external APIs
+
+**12. 6 Governance pages** (Azure Resource Graph API)
+Resource inventory, compliance state, NSG rules, VM config, SQL config, disk encryption. See section 16.
+
+**13. 2 Workload Optimization pages** (Azure Advisor API)
+Right-sizing recommendations, unattached disk detection. See section 16.
+
+**14. Audit log**
+Track who viewed what, when. Important once authentication is live. Store in a server-side log (database or append-only file). Show in a Settings > Audit page for admins.
+
+### Operations & deployment
+
+**15. Deployment guide**
+How to deploy to Azure App Service, Azure Static Web Apps, or Vercel. Include Dockerfile, `azure-pipelines.yml` or GitHub Actions workflow, and environment variable configuration.
+
+**16. CI/CD pipeline**
+GitHub Actions workflow: lint, type-check, build on PR. Auto-deploy to staging on merge to main. Production deploy on release tag.
+
+**17. Showback dashboard for cost center owners**
+A simplified, read-only view filtered to a specific cost center's scope. Lighter than the full app — just KPI cards, monthly trend, and top resources. Could be a separate route (`/showback/:costCenter`) or a standalone mini-app.
+
+### FinOps framework alignment
+
+**18. FinOps maturity assessment**
+Self-assessment page mapping the organization's capabilities to the FinOps Framework phases (Inform, Optimize, Operate). Interactive checklist with scoring and recommendations for next steps. Reference: https://www.finops.org/framework/
 
 ### Implementation order suggestion
-1. Anomaly detection (new page + Summary banner, uses existing data)
-2. Amortized cost view (toggle across reports, needs data model consideration)
-3. Parquet file support (new parser dependency)
-4. Showback/chargeback export (PDF generation dependency)
-5. MSAL / Entra ID authentication (see section 17 — unlocks Governance + Workload)
-6. Multi-tenant support (architecture change)
-7. Scheduled report delivery (requires backend infrastructure)
+
+**Phase A — Quick wins (no new dependencies):**
+1. Cost forecasting (trend line on existing charts)
+2. Budget alerts with thresholds (enhance existing budget feature)
+3. Saved filter presets (localStorage, UI only)
+4. Currency conversion toggle (FOCUS data has USD fields)
+
+**Phase B — After auth configured (needs app registration):**
+5. Multi-tenant billing account support
+6. Governance pages (Resource Graph)
+7. Workload Optimization pages (Advisor)
+8. Audit log
+
+**Phase C — Infrastructure additions:**
+9. CI/CD pipeline + deployment guide
+10. Automated export sync
+11. Scheduled report delivery + notifications
+12. Showback dashboard for cost center owners
+
+**Phase D — Advanced features:**
+13. Dashboard customization
+14. Commitment planner / what-if calculator
+15. Data retention / archival
+16. FinOps maturity assessment
 
 ---
 
