@@ -349,29 +349,32 @@ Instead of manual azcopy, build a scheduled job (Azure Functions or Next.js cron
 
 ### Open — needs auth + external APIs
 
-**12. 6 Governance pages** (Azure Resource Graph API)
+**12. Azure Forecast API integration**
+Replace the local linear regression on the Forecasting page with Microsoft's Cost Management Forecast API (`POST /providers/Microsoft.CostManagement/forecast`). The API uses ML models trained on actual usage patterns, reservation schedules, and seasonal trends — significantly more accurate than simple regression. Architecture: use the API as primary source when authenticated, fall back to local linear regression for CSV-only / anonymous mode. Reference: https://learn.microsoft.com/en-us/rest/api/cost-management/forecast/usage
+
+**13. 6 Governance pages** (Azure Resource Graph API)
 Resource inventory, compliance state, NSG rules, VM config, SQL config, disk encryption. See section 16.
 
-**13. 2 Workload Optimization pages** (Azure Advisor API)
+**14. 2 Workload Optimization pages** (Azure Advisor API)
 Right-sizing recommendations, unattached disk detection. See section 16.
 
-**14. Audit log**
+**15. Audit log**
 Track who viewed what, when. Important once authentication is live. Store in a server-side log (database or append-only file). Show in a Settings > Audit page for admins.
 
 ### Operations & deployment
 
-**15. Deployment guide**
+**16. Deployment guide**
 How to deploy to Azure App Service, Azure Static Web Apps, or Vercel. Include Dockerfile, `azure-pipelines.yml` or GitHub Actions workflow, and environment variable configuration.
 
-**16. CI/CD pipeline**
+**17. CI/CD pipeline**
 GitHub Actions workflow: lint, type-check, build on PR. Auto-deploy to staging on merge to main. Production deploy on release tag.
 
-**17. Showback dashboard for cost center owners**
+**18. Showback dashboard for cost center owners**
 A simplified, read-only view filtered to a specific cost center's scope. Lighter than the full app — just KPI cards, monthly trend, and top resources. Could be a separate route (`/showback/:costCenter`) or a standalone mini-app.
 
 ### FinOps framework alignment
 
-**18. FinOps maturity assessment**
+**19. FinOps maturity assessment**
 Self-assessment page mapping the organization's capabilities to the FinOps Framework phases (Inform, Optimize, Operate). Interactive checklist with scoring and recommendations for next steps. Reference: https://www.finops.org/framework/
 
 ### Implementation order suggestion
@@ -383,10 +386,11 @@ Self-assessment page mapping the organization's capabilities to the FinOps Frame
 4. Currency conversion toggle (FOCUS data has USD fields)
 
 **Phase B — After auth configured (needs app registration):**
-5. Multi-tenant billing account support
-6. Governance pages (Resource Graph)
-7. Workload Optimization pages (Advisor)
-8. Audit log
+5. Azure Forecast API integration (replace local regression)
+6. Multi-tenant billing account support
+7. Governance pages (Resource Graph)
+8. Workload Optimization pages (Advisor)
+9. Audit log
 
 **Phase C — Infrastructure additions:**
 9. CI/CD pipeline + deployment guide
