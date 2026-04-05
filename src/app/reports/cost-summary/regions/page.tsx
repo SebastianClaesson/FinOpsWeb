@@ -22,11 +22,13 @@ export default function RegionsPage() {
   const { formatCurrency, formatCompact } = useCurrencyFormat();
   const [regionBudgets, setRegionBudgets] = useState<Record<string, number>>({});
   const [yearlyBudget, setYearlyBudget] = useState(0);
+  const [budgetAlertThresholds, setBudgetAlertThresholds] = useState<number[]>([80, 90, 100]);
 
   useEffect(() => {
     const s = loadSettings();
     setRegionBudgets(s.regionBudgets);
     setYearlyBudget(s.yearlyBudget);
+    setBudgetAlertThresholds(s.budgetAlertThresholds);
   }, []);
 
   const grouped = useMemo(
@@ -137,8 +139,32 @@ export default function RegionsPage() {
                     const periodBgt = (yearlyBgt / 12) * numMonths;
                     const remaining = periodBgt - region.effectiveCost;
                     const pct = periodBgt > 0 ? (region.effectiveCost / periodBgt) * 100 : 0;
-                    const isOver = pct > 100;
                     const annualPace = numMonths > 0 ? (region.effectiveCost / numMonths) * 12 : 0;
+
+                    // Threshold-based coloring
+                    const sortedThresholds = [...budgetAlertThresholds].sort((a, b) => a - b);
+                    const overThreshold = sortedThresholds[2] ?? 100;
+                    const criticalThreshold = sortedThresholds[1] ?? 90;
+                    const warningThreshold = sortedThresholds[0] ?? 80;
+                    const isOver = pct >= overThreshold;
+                    const isCritical = pct >= criticalThreshold && !isOver;
+                    const isWarning = pct >= warningThreshold && !isCritical && !isOver;
+
+                    let barColorClass = "bg-primary";
+                    let pctTextClass = "";
+                    let remainingTextClass = "text-green-600";
+                    if (isOver) {
+                      barColorClass = "bg-red-500";
+                      pctTextClass = "text-red-500 font-semibold";
+                      remainingTextClass = "text-red-500";
+                    } else if (isCritical) {
+                      barColorClass = "bg-orange-500";
+                      pctTextClass = "text-orange-500 font-semibold";
+                    } else if (isWarning) {
+                      barColorClass = "bg-amber-500";
+                      pctTextClass = "text-amber-500";
+                    }
+
                     return (
                       <tr key={region.name} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-3 py-2 font-medium flex items-center gap-2">
@@ -151,18 +177,28 @@ export default function RegionsPage() {
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
                           {formatCurrency(periodBgt)}
                         </td>
-                        <td className={`px-3 py-2 text-right font-mono ${isOver ? "text-red-500" : "text-green-600"}`}>
+                        <td className={`px-3 py-2 text-right font-mono ${remainingTextClass}`}>
                           {isOver ? "-" : ""}{formatCurrency(Math.abs(remaining))}
                         </td>
-                        <td className={`px-3 py-2 text-right font-mono ${isOver ? "text-red-500 font-semibold" : ""}`}>
+                        <td className={`px-3 py-2 text-right font-mono ${pctTextClass}`}>
                           {pct.toFixed(0)}%
                         </td>
                         <td className="px-3 py-2">
-                          <div className="w-full bg-muted rounded-full h-2">
+                          <div className="relative w-full bg-muted rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full transition-all ${isOver ? "bg-red-500" : "bg-primary"}`}
+                              className={`h-2 rounded-full transition-all ${barColorClass}`}
                               style={{ width: `${Math.min(pct, 100)}%` }}
                             />
+                            {sortedThresholds.map((t) => (
+                              t <= 100 && (
+                                <div
+                                  key={t}
+                                  className="absolute top-0 h-2 w-0.5 bg-foreground/40"
+                                  style={{ left: `${t}%` }}
+                                  title={`${t}% threshold`}
+                                />
+                              )
+                            ))}
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">

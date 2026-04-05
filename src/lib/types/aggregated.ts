@@ -29,10 +29,15 @@ export interface CostFactRow {
   CommitmentDiscountType: string;
   BillingCurrency: string;
 
-  // Summed cost measures
+  // Summed cost measures (in billing currency)
   effectiveCost: number;
   billedCost: number;
   listCost: number;
+
+  // Summed cost measures (in USD, from x_*CostInUsd FOCUS fields)
+  effectiveCostInUsd: number;
+  billedCostInUsd: number;
+  listCostInUsd: number;
 
   /** Number of raw CSV rows collapsed into this fact row. */
   recordCount: number;

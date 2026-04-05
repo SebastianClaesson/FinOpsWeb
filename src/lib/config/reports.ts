@@ -68,6 +68,7 @@ export const REPORTS: ReportDefinition[] = [
       { name: "Usage Analysis", href: "/reports/cost-summary/usage-analysis", icon: BarChart3 },
       { name: "Tag Compliance", href: "/reports/cost-summary/tag-compliance", icon: Tag },
       { name: "Anomalies", href: "/reports/cost-summary/anomalies", icon: AlertTriangle },
+      { name: "Forecasting", href: "/reports/cost-summary/forecasting", icon: TrendingUp },
       { name: "Data Quality", href: "/reports/cost-summary/data-quality", icon: ShieldCheck },
     ],
   },

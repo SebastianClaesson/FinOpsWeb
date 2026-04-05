@@ -22,6 +22,8 @@ export interface UserSettings {
   yearlyBudget: number;
   /** Per-region yearly budgets (region name -> amount). Empty = no regional budgets. */
   regionBudgets: Record<string, number>;
+  /** Budget alert thresholds as percentages (e.g. [80, 90, 100]) */
+  budgetAlertThresholds: number[];
 }
 
 const STORAGE_KEY = "finops-user-settings";
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   showSavings: true,
   yearlyBudget: 0,
   regionBudgets: {},
+  budgetAlertThresholds: [80, 90, 100],
 };
 
 export function loadSettings(): UserSettings {

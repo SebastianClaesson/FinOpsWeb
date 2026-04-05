@@ -314,6 +314,65 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Alert Thresholds (%)</label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-amber-600 dark:text-amber-400 font-medium">Warning</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.budgetAlertThresholds[0] ?? 80}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setSettings((s) => ({
+                      ...s,
+                      budgetAlertThresholds: [val, s.budgetAlertThresholds[1] ?? 90, s.budgetAlertThresholds[2] ?? 100],
+                    }));
+                  }}
+                  className="h-9 w-full rounded-lg border bg-background px-3 text-sm font-mono transition-colors focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-orange-600 dark:text-orange-400 font-medium">Critical</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.budgetAlertThresholds[1] ?? 90}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setSettings((s) => ({
+                      ...s,
+                      budgetAlertThresholds: [s.budgetAlertThresholds[0] ?? 80, val, s.budgetAlertThresholds[2] ?? 100],
+                    }));
+                  }}
+                  className="h-9 w-full rounded-lg border bg-background px-3 text-sm font-mono transition-colors focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-red-600 dark:text-red-400 font-medium">Over budget</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={settings.budgetAlertThresholds[2] ?? 100}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setSettings((s) => ({
+                      ...s,
+                      budgetAlertThresholds: [s.budgetAlertThresholds[0] ?? 80, s.budgetAlertThresholds[1] ?? 90, val],
+                    }));
+                  }}
+                  className="h-9 w-full rounded-lg border bg-background px-3 text-sm font-mono transition-colors focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Budget progress bar changes color when usage reaches these thresholds.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between rounded-lg border px-4 py-3">
             <div>
               <p className="text-sm font-medium">Show Savings Columns</p>

@@ -12,6 +12,8 @@ function ReportShell({ children }: { children: ReactNode }) {
     setFilters,
     amortizedView,
     setAmortizedView,
+    showInUsd,
+    setShowInUsd,
     availableSubscriptions,
     availableResourceGroups,
     availableRegions,
@@ -104,6 +106,8 @@ function ReportShell({ children }: { children: ReactNode }) {
         availableTagKeys={availableTagKeys}
         amortizedView={amortizedView}
         onAmortizedChange={setAmortizedView}
+        showInUsd={showInUsd}
+        onShowInUsdChange={setShowInUsd}
       />
 
       {hasMixedCurrencies && (

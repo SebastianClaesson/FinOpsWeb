@@ -37,6 +37,8 @@ interface ReportContextValue {
   setFilters: (filters: FilterState) => void;
   amortizedView: boolean;
   setAmortizedView: (v: boolean) => void;
+  showInUsd: boolean;
+  setShowInUsd: (v: boolean) => void;
   availableSubscriptions: string[];
   availableResourceGroups: string[];
   availableRegions: string[];
@@ -142,6 +144,7 @@ export function ReportProvider({ children }: { children: ReactNode }) {
   };
 
   const [amortizedView, setAmortizedView] = useState(false);
+  const [showInUsd, setShowInUsd] = useState(false);
 
   const factTable = aggregated?.factTable ?? [];
 
@@ -202,8 +205,17 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     if (amortizedView) {
       facts = facts.filter(f => f.ChargeCategory !== "Purchase");
     }
+    // When USD conversion is on, swap cost fields to USD equivalents
+    if (showInUsd) {
+      facts = facts.map(f => ({
+        ...f,
+        effectiveCost: f.effectiveCostInUsd,
+        billedCost: f.billedCostInUsd,
+        listCost: f.listCostInUsd,
+      }));
+    }
     return facts;
-  }, [factTable, filters, amortizedView]);
+  }, [factTable, filters, amortizedView, showInUsd]);
 
   // Detail tables (unfiltered — pages apply their own filtering)
   const resources = aggregated?.resources ?? [];
@@ -220,6 +232,8 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     setFilters,
     amortizedView,
     setAmortizedView,
+    showInUsd,
+    setShowInUsd,
     availableSubscriptions,
     availableResourceGroups,
     availableRegions,
@@ -232,7 +246,7 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     usage,
     tagCosts,
     dataQuality,
-    currency: detectedCurrency,
+    currency: showInUsd ? "USD" : detectedCurrency,
     manifest: aggregated?.meta.manifest ?? null,
     dataSource,
     dataFiles,

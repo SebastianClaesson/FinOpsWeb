@@ -9,6 +9,7 @@ function ReportShell({ children }: { children: ReactNode }) {
   const {
     filteredFacts, filters, setFilters,
     amortizedView, setAmortizedView,
+    showInUsd, setShowInUsd,
     availableSubscriptions, availableResourceGroups, availableRegions,
     availableServices, availableCommitmentTypes, availableTagKeys,
   } = useReport();
@@ -35,6 +36,8 @@ function ReportShell({ children }: { children: ReactNode }) {
         availableTagKeys={availableTagKeys}
         amortizedView={amortizedView}
         onAmortizedChange={setAmortizedView}
+        showInUsd={showInUsd}
+        onShowInUsdChange={setShowInUsd}
       />
       <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
         {children}

@@ -41,9 +41,12 @@ export default function SummaryPage() {
   const { filteredFacts, resources } = useReport();
   const { formatCurrency, formatCompact, currency } = useCurrencyFormat();
   const [yearlyBudget, setYearlyBudget] = useState(0);
+  const [budgetAlertThresholds, setBudgetAlertThresholds] = useState<number[]>([80, 90, 100]);
 
   useEffect(() => {
-    setYearlyBudget(loadSettings().yearlyBudget);
+    const s = loadSettings();
+    setYearlyBudget(s.yearlyBudget);
+    setBudgetAlertThresholds(s.budgetAlertThresholds);
   }, []);
 
   const totals = useMemo(() => calculateFactTotals(filteredFacts), [filteredFacts]);
@@ -310,29 +313,73 @@ export default function SummaryPage() {
           const periodBudget = monthlyBudget * numMonths;
           const used = totals.effectiveCost;
           const pctUsed = periodBudget > 0 ? (used / periodBudget) * 100 : 0;
-          const isOver = pctUsed > 100;
           const annualPace = numMonths > 0 ? (used / numMonths) * 12 : 0;
           const annualPacePct = yearlyBudget > 0 ? (annualPace / yearlyBudget) * 100 : 0;
+
+          // Determine bar color based on highest crossed threshold
+          const sortedThresholds = [...budgetAlertThresholds].sort((a, b) => a - b);
+          const overThreshold = sortedThresholds[2] ?? 100;
+          const criticalThreshold = sortedThresholds[1] ?? 90;
+          const warningThreshold = sortedThresholds[0] ?? 80;
+          const isOver = pctUsed >= overThreshold;
+          const isCritical = pctUsed >= criticalThreshold && !isOver;
+          const isWarning = pctUsed >= warningThreshold && !isCritical && !isOver;
+
+          let barColorClass = "bg-primary";
+          let gradientClass = "from-primary/5";
+          let iconBgClass = "bg-primary/10";
+          let iconColorClass = "text-primary";
+          let textColorClass = "";
+          if (isOver) {
+            barColorClass = "bg-red-500";
+            gradientClass = "from-red-500/5 dark:from-red-500/10";
+            iconBgClass = "bg-red-500/10";
+            iconColorClass = "text-red-500";
+            textColorClass = "text-red-500";
+          } else if (isCritical) {
+            barColorClass = "bg-orange-500";
+            gradientClass = "from-orange-500/5 dark:from-orange-500/10";
+            iconBgClass = "bg-orange-500/10";
+            iconColorClass = "text-orange-500";
+            textColorClass = "text-orange-500";
+          } else if (isWarning) {
+            barColorClass = "bg-amber-500";
+            gradientClass = "from-amber-500/5 dark:from-amber-500/10";
+            iconBgClass = "bg-amber-500/10";
+            iconColorClass = "text-amber-500";
+            textColorClass = "text-amber-500";
+          }
+
           return (
             <Card className="relative overflow-hidden">
-              <div className={`absolute inset-0 bg-gradient-to-br ${isOver ? "from-red-500/5 dark:from-red-500/10" : "from-primary/5"} to-transparent`} />
+              <div className={`absolute inset-0 bg-gradient-to-br ${gradientClass} to-transparent`} />
               <CardHeader className="relative flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Budget
                 </CardTitle>
-                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isOver ? "bg-red-500/10" : "bg-primary/10"}`}>
-                  <Target className={`h-4 w-4 ${isOver ? "text-red-500" : "text-primary"}`} />
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconBgClass}`}>
+                  <Target className={`h-4 w-4 ${iconColorClass}`} />
                 </div>
               </CardHeader>
               <CardContent className="relative space-y-2">
-                <div className={`text-2xl font-bold tracking-tight ${isOver ? "text-red-500" : ""}`}>
+                <div className={`text-2xl font-bold tracking-tight ${textColorClass}`}>
                   {pctUsed.toFixed(0)}%
                 </div>
-                <div className="w-full bg-muted rounded-full h-2">
+                <div className="relative w-full bg-muted rounded-full h-2">
                   <div
-                    className={`h-2 rounded-full transition-all ${isOver ? "bg-red-500" : "bg-primary"}`}
+                    className={`h-2 rounded-full transition-all ${barColorClass}`}
                     style={{ width: `${Math.min(pctUsed, 100)}%` }}
                   />
+                  {sortedThresholds.map((t) => (
+                    t <= 100 && (
+                      <div
+                        key={t}
+                        className="absolute top-0 h-2 w-0.5 bg-foreground/40"
+                        style={{ left: `${t}%` }}
+                        title={`${t}% threshold`}
+                      />
+                    )
+                  ))}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {formatCompact(used)} of {formatCompact(periodBudget)} ({numMonths}mo)
@@ -345,6 +392,48 @@ export default function SummaryPage() {
           );
         })()}
       </div>
+
+      {/* Budget Warning Banner */}
+      {yearlyBudget > 0 && (() => {
+        const monthlyBudget = yearlyBudget / 12;
+        const numMonths = monthlyTrend.length || 1;
+        const periodBudget = monthlyBudget * numMonths;
+        const pctUsed = periodBudget > 0 ? (totals.effectiveCost / periodBudget) * 100 : 0;
+        const sortedThresholds = [...budgetAlertThresholds].sort((a, b) => a - b);
+        const overThreshold = sortedThresholds[2] ?? 100;
+        const criticalThreshold = sortedThresholds[1] ?? 90;
+        const warningThreshold = sortedThresholds[0] ?? 80;
+
+        if (pctUsed >= overThreshold) {
+          return (
+            <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+              <p className="text-sm text-red-700 dark:text-red-400">
+                Budget exceeded at {pctUsed.toFixed(0)}%
+              </p>
+            </div>
+          );
+        } else if (pctUsed >= criticalThreshold) {
+          return (
+            <div className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-orange-500" />
+              <p className="text-sm text-orange-700 dark:text-orange-400">
+                Budget usage at {pctUsed.toFixed(0)}% &mdash; nearing limit
+              </p>
+            </div>
+          );
+        } else if (pctUsed >= warningThreshold) {
+          return (
+            <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Budget usage at {pctUsed.toFixed(0)}% &mdash; approaching limit
+              </p>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Resource Count by Month */}
       <Card>

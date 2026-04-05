@@ -124,6 +124,9 @@ export function aggregateRecord(r: FocusCostRecord, maps: AggregationMaps): void
     existing.effectiveCost += r.EffectiveCost;
     existing.billedCost += r.BilledCost;
     existing.listCost += r.ListCost;
+    existing.effectiveCostInUsd += (r.x_EffectiveCostInUsd ?? 0);
+    existing.billedCostInUsd += (r.x_BilledCostInUsd ?? 0);
+    existing.listCostInUsd += (r.x_ListCostInUsd ?? 0);
     existing.recordCount += 1;
   } else {
     maps.facts.set(fk, {
@@ -142,6 +145,9 @@ export function aggregateRecord(r: FocusCostRecord, maps: AggregationMaps): void
       effectiveCost: r.EffectiveCost,
       billedCost: r.BilledCost,
       listCost: r.ListCost,
+      effectiveCostInUsd: r.x_EffectiveCostInUsd ?? 0,
+      billedCostInUsd: r.x_BilledCostInUsd ?? 0,
+      listCostInUsd: r.x_ListCostInUsd ?? 0,
       recordCount: 1,
     });
   }
@@ -284,6 +290,9 @@ export function finalizeAggregation(
     row.effectiveCost = round2(row.effectiveCost);
     row.billedCost = round2(row.billedCost);
     row.listCost = round2(row.listCost);
+    row.effectiveCostInUsd = round2(row.effectiveCostInUsd);
+    row.billedCostInUsd = round2(row.billedCostInUsd);
+    row.listCostInUsd = round2(row.listCostInUsd);
     factTable.push(row);
   }
   factTable.sort((a, b) => a.date.localeCompare(b.date));

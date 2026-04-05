@@ -302,3 +302,77 @@ export function detectAnomalies(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Cost forecasting (linear regression)
+// ---------------------------------------------------------------------------
+
+export interface ForecastPoint {
+  date: string;
+  forecastCost: number;
+  upperBound: number;
+  lowerBound: number;
+}
+
+/**
+ * Generate a cost forecast using linear regression on historical daily costs.
+ * Uses the last `lookbackDays` of data to fit the trend, then projects `forecastDays` ahead.
+ */
+export function generateForecast(
+  facts: CostFactRow[],
+  forecastDays = 30,
+  lookbackDays = 60
+): ForecastPoint[] {
+  const daily = groupFactsByDate(facts, "day");
+  if (daily.length < 7) return []; // Need at least a week of data
+
+  // Use the last N days for regression
+  const window = daily.slice(-lookbackDays);
+  const n = window.length;
+
+  // Convert dates to numeric x (days since first point)
+  const startDate = new Date(window[0].date).getTime();
+  const msPerDay = 86400000;
+  const xs = window.map((d) => (new Date(d.date).getTime() - startDate) / msPerDay);
+  const ys = window.map((d) => d.effectiveCost);
+
+  // Linear regression: y = slope * x + intercept
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
+  const sumX2 = xs.reduce((a, x) => a + x * x, 0);
+
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return [];
+
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Compute residual standard deviation for confidence bands
+  const residuals = ys.map((y, i) => y - (slope * xs[i] + intercept));
+  const residualVariance = residuals.reduce((a, r) => a + r * r, 0) / Math.max(n - 2, 1);
+  const residualStddev = Math.sqrt(residualVariance);
+
+  // Generate forecast points
+  const lastDate = new Date(window[n - 1].date);
+  const lastX = xs[n - 1];
+  const result: ForecastPoint[] = [];
+
+  for (let i = 1; i <= forecastDays; i++) {
+    const x = lastX + i;
+    const predicted = Math.max(0, slope * x + intercept);
+
+    const forecastDate = new Date(lastDate);
+    forecastDate.setDate(forecastDate.getDate() + i);
+    const dateStr = forecastDate.toISOString().substring(0, 10);
+
+    result.push({
+      date: dateStr,
+      forecastCost: Math.round(predicted * 100) / 100,
+      upperBound: Math.round((predicted + residualStddev) * 100) / 100,
+      lowerBound: Math.round(Math.max(0, predicted - residualStddev) * 100) / 100,
+    });
+  }
+
+  return result;
+}
